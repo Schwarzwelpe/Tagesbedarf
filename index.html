@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tagesbedarf</title>
+<meta name="description" content="Tagesbedarf Rechner: Ruheenergie plus Aktivität plus Surplus.">
+<meta name="theme-color" content="#f1f5fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e181e" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tagesbedarf">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root {
+  /* Layout: eine Spalte, passt auf einen iPhone Screen: Titel, sieben Zeilen, Gesamt, Aktionen */
+  --bg: #f1f5fa;
+  --surface: #ffffff;
+  --ink: #1b2a33;
+  --muted: #5d6f7b;
+  --input-row: #eaf2ff;
+  --input-ink: #1f4fd8;
+  --calc-row: #e4f0ec;
+  --total-bg: #17414a;
+  --total-ink: #ffffff;
+  --line: #d3dfe9;
+  --focus: #1f4fd8;
+  --danger: #b3261e;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e181e;
+    --surface: #15242c;
+    --ink: #e6eef2;
+    --muted: #93a6b2;
+    --input-row: #172a3d;
+    --input-ink: #86adff;
+    --calc-row: #17302a;
+    --total-bg: #1f5a66;
+    --total-ink: #ffffff;
+    --line: #2a3d48;
+    --focus: #86adff;
+    --danger: #ff8a80;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100%;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font); font-variant-numeric: tabular-nums;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+}
+main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
+header h1 { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.015em; }
+header p { margin: 0; color: var(--muted); font-size: 0.85rem; text-align: right; }
+
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: clamp(52px, 7.4dvh, 64px); padding: 6px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.row.input { background: var(--input-row); }
+.row.calc { background: var(--calc-row); font-weight: 700; }
+.row .label { font-size: 1.1rem; }
+.row .value { display: flex; align-items: baseline; gap: 6px; }
+.unit { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+
+.row input {
+  width: 6.5ch; min-width: 0; height: 44px; text-align: right;
+  font: 800 1.5rem/1 var(--font); font-variant-numeric: tabular-nums;
+  color: var(--input-ink); background: transparent;
+  border: 0; border-radius: 8px; padding: 0 2px;
+  touch-action: manipulation;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.row input::-webkit-outer-spin-button,
+.row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.row input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; background: color-mix(in srgb, var(--input-ink) 8%, transparent); }
+.row.calc .num { font-size: 1.5rem; font-weight: 800; }
+
+.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 14px 12px; background: var(--input-row); border-bottom: 1px solid var(--line); }
+
+button {
+  font: 700 1rem var(--font); cursor: pointer; touch-action: manipulation;
+  border-radius: 12px; border: 1.5px solid var(--input-ink); color: var(--input-ink);
+  background: transparent; padding: 0 12px; min-height: 44px;
+}
+button:active { background: color-mix(in srgb, var(--input-ink) 16%, transparent); }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.total {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--total-bg); color: var(--total-ink);
+  min-height: clamp(76px, 11dvh, 96px); padding: 12px 18px;
+}
+.total .value { gap: 10px; }
+.total .label { font-size: 1.6rem; font-weight: 800; }
+.total .num { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.015em; }
+.total .unit { color: color-mix(in srgb, var(--total-ink) 72%, transparent); }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.actions button { min-height: 50px; }
+.actions .copy { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
+.actions .copy:active { background: color-mix(in srgb, var(--total-bg) 82%, black); }
+.actions .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
+.actions .reset.armed { border-color: var(--danger); color: var(--danger); }
+
+.note { margin: 0; padding: 0 4px; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Tagesbedarf</h1>
+    <p>kcal pro Tag</p>
+  </header>
+
+  <section class="sheet" aria-label="Eingaben und Ergebnis">
+    <label class="row input" for="ruhe">
+      <span class="label">Ruheenergie</span>
+      <span class="value"><input id="ruhe" data-key="ruhe" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+    <label class="row input" for="t1">
+      <span class="label">Training 1</span>
+      <span class="value"><input id="t1" data-key="t1" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+    <label class="row input" for="t2">
+      <span class="label">Training 2</span>
+      <span class="value"><input id="t2" data-key="t2" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+    <label class="row input" for="t3">
+      <span class="label">Training 3</span>
+      <span class="value"><input id="t3" data-key="t3" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+    <label class="row input" for="alltag">
+      <span class="label">Alltag</span>
+      <span class="value"><input id="alltag" data-key="alltag" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+
+    <div class="row calc">
+      <span class="label">Aktivität</span>
+      <span class="value"><span class="num" id="out-aktivitaet">0</span><span class="unit">kcal</span></span>
+    </div>
+    <div class="row calc">
+      <span class="label">Zwischenstand</span>
+      <span class="value"><span class="num" id="out-zwischen">0</span><span class="unit">kcal</span></span>
+    </div>
+
+    <label class="row input" for="surplus">
+      <span class="label">Surplus</span>
+      <span class="value"><input id="surplus" data-key="surplus" type="number" enterkeyhint="done" step="50" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+    <div class="chips" role="group" aria-label="Surplus Schnellwahl">
+      <button type="button" data-surplus="0">0</button>
+      <button type="button" data-surplus="150">+150</button>
+      <button type="button" data-step="-50">−50</button>
+      <button type="button" data-step="50">+50</button>
+    </div>
+
+    <div class="total" aria-live="polite">
+      <span class="label">Gesamt</span>
+      <span class="value"><span class="num" id="out-gesamt">0</span><span class="unit">kcal</span></span>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button type="button" class="copy" id="copy">Gesamt kopieren</button>
+    <button type="button" class="reset" id="reset">Reset</button>
+  </div>
+  <p class="note">Reset setzt Training und Alltag auf 0, Ruheenergie und Surplus bleiben. Gespeichert wird auf diesem Gerät. v1.0.0</p>
+</main>
+
+<script>
+(function () {
+  var STORE_KEY = "tagesbedarf-v1";
+  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 0, surplus: 150 };
+  var RESET_KEYS = ["t1", "t2", "t3", "alltag"];
+  var KEYS = Object.keys(DEFAULTS);
+  var nf = new Intl.NumberFormat("de-DE");
+  var state = {};
+  var inputs = {};
+
+  KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      KEYS.forEach(function (k) {
+        if (typeof saved[k] === "number" && isFinite(saved[k])) state[k] = saved[k];
+      });
+    } catch (e) { /* ohne Speicher weiterarbeiten */ }
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* egal */ }
+  }
+
+  function calc(s) {
+    var aktivitaet = s.t1 + s.t2 + s.t3 + s.alltag;
+    var zwischen = s.ruhe + aktivitaet;
+    var gesamt = zwischen + s.surplus;
+    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt };
+  }
+  function fmt(n) { return nf.format(Math.round(n)); }
+
+  function update() {
+    var r = calc(state);
+    document.getElementById("out-aktivitaet").textContent = fmt(r.aktivitaet);
+    document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
+    document.getElementById("out-gesamt").textContent = fmt(r.gesamt);
+  }
+  function writeInputs() {
+    KEYS.forEach(function (k) { inputs[k].value = state[k]; });
+  }
+
+  document.querySelectorAll("input[data-key]").forEach(function (el) {
+    inputs[el.dataset.key] = el;
+    el.addEventListener("input", function () {
+      var v = parseFloat(String(el.value).replace(",", "."));
+      state[el.dataset.key] = isFinite(v) ? v : 0;
+      save();
+      update();
+    });
+    el.addEventListener("focus", function () { try { el.select(); } catch (e) {} });
+    el.addEventListener("keydown", function (ev) { if (ev.key === "Enter") el.blur(); });
+  });
+
+  document.querySelectorAll("button[data-surplus]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.surplus = Number(b.dataset.surplus);
+      inputs.surplus.value = state.surplus;
+      save(); update();
+    });
+  });
+  document.querySelectorAll("button[data-step]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.surplus = state.surplus + Number(b.dataset.step);
+      inputs.surplus.value = state.surplus;
+      save(); update();
+    });
+  });
+
+  /* Reset: zwei Taps, damit er nicht versehentlich auslöst */
+  var resetBtn = document.getElementById("reset");
+  var armed = false, armTimer = null;
+  function disarm() {
+    armed = false; clearTimeout(armTimer);
+    resetBtn.textContent = "Reset";
+    resetBtn.classList.remove("armed");
+  }
+  resetBtn.addEventListener("click", function () {
+    if (!armed) {
+      armed = true;
+      resetBtn.textContent = "Wirklich zurücksetzen?";
+      resetBtn.classList.add("armed");
+      armTimer = setTimeout(disarm, 3000);
+      return;
+    }
+    disarm();
+    RESET_KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
+    writeInputs(); save(); update();
+  });
+
+  var copyBtn = document.getElementById("copy");
+  copyBtn.addEventListener("click", function () {
+    var text = String(Math.round(calc(state).gesamt));
+    var done = function (msg) {
+      copyBtn.textContent = msg;
+      setTimeout(function () { copyBtn.textContent = "Gesamt kopieren"; }, 1600);
+    };
+    try {
+      navigator.clipboard.writeText(text).then(
+        function () { done("Kopiert: " + text); },
+        function () { done("Kopieren nicht möglich"); }
+      );
+    } catch (e) { done("Kopieren nicht möglich"); }
+  });
+
+  load();
+  writeInputs();
+  update();
+})();
+</script>
+</body>
+</html>
