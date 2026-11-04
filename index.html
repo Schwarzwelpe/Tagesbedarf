@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tagesbedarf</title>
-<meta name="description" content="Tagesbedarf Rechner: Ruheenergie plus Aktivität plus Surplus.">
+<meta name="description" content="Tagesbedarf Rechner: Ruheenergie plus Aktivität plus Surplus, abzüglich geplantem Essen.">
 <meta name="theme-color" content="#f1f5fa" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e181e" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 :root {
-  /* Layout: eine Spalte, passt auf einen iPhone Screen: Titel, sieben Zeilen, Gesamt, Aktionen */
+  /* Layout: eine Spalte, alle Zeilen kompakt auf einer Handyseite: Eingaben, Summen, Gesamt, Essen, Rest */
   --bg: #f1f5fa;
   --surface: #ffffff;
   --ink: #1b2a33;
@@ -27,10 +27,15 @@
   --calc-row: #e4f0ec;
   --total-bg: #17414a;
   --total-ink: #ffffff;
+  --rest-bg: #e4f0ec;
+  --rest-ink: #0d6b4f;
   --line: #d3dfe9;
   --focus: #1f4fd8;
   --danger: #b3261e;
+  --danger-bg: #fdeceb;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --row-h: clamp(34px, 5.1dvh, 44px);
+  --big-h: clamp(54px, 8dvh, 68px);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -44,9 +49,12 @@
     --calc-row: #17302a;
     --total-bg: #1f5a66;
     --total-ink: #ffffff;
+    --rest-bg: #17302a;
+    --rest-ink: #6fe0b4;
     --line: #2a3d48;
     --focus: #86adff;
     --danger: #ff8a80;
+    --danger-bg: #3a1c1a;
     color-scheme: dark;
   }
 }
@@ -58,33 +66,34 @@ body {
   background: var(--bg); color: var(--ink);
   font-family: var(--font); font-variant-numeric: tabular-nums;
   padding:
-    max(14px, env(safe-area-inset-top))
+    max(10px, env(safe-area-inset-top))
     max(14px, env(safe-area-inset-right))
-    max(18px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-bottom))
     max(14px, env(safe-area-inset-left));
 }
-main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
 header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
-header h1 { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.015em; }
-header p { margin: 0; color: var(--muted); font-size: 0.85rem; text-align: right; }
+header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.015em; }
+header span { color: var(--muted); font-size: 0.75rem; }
 
-.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 
 .row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  min-height: clamp(52px, 7.4dvh, 64px); padding: 6px 18px;
+  min-height: var(--row-h); padding: 2px 16px;
   border-bottom: 1px solid var(--line);
 }
+.row:last-child { border-bottom: 0; }
 .row.input { background: var(--input-row); }
 .row.calc { background: var(--calc-row); font-weight: 700; }
-.row .label { font-size: 1.1rem; }
+.row .label { font-size: 1.02rem; }
 .row .value { display: flex; align-items: baseline; gap: 6px; }
-.unit { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.unit { color: var(--muted); font-size: 0.75rem; font-weight: 600; }
 
 .row input {
-  width: 6.5ch; min-width: 0; height: 44px; text-align: right;
-  font: 800 1.5rem/1 var(--font); font-variant-numeric: tabular-nums;
+  width: 6.5ch; min-width: 0; height: 34px; text-align: right;
+  font: 800 1.3rem/1 var(--font); font-variant-numeric: tabular-nums;
   color: var(--input-ink); background: transparent;
   border: 0; border-radius: 8px; padding: 0 2px;
   touch-action: manipulation;
@@ -93,43 +102,46 @@ header p { margin: 0; color: var(--muted); font-size: 0.85rem; text-align: right
 .row input::-webkit-outer-spin-button,
 .row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .row input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; background: color-mix(in srgb, var(--input-ink) 8%, transparent); }
-.row.calc .num { font-size: 1.5rem; font-weight: 800; }
+.row.calc .num { font-size: 1.3rem; font-weight: 800; }
 
-.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px 14px 12px; background: var(--input-row); border-bottom: 1px solid var(--line); }
+.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 6px 14px 8px; background: var(--input-row); border-bottom: 1px solid var(--line); }
 
 button {
-  font: 700 1rem var(--font); cursor: pointer; touch-action: manipulation;
-  border-radius: 12px; border: 1.5px solid var(--input-ink); color: var(--input-ink);
-  background: transparent; padding: 0 12px; min-height: 44px;
+  font: 700 0.95rem var(--font); cursor: pointer; touch-action: manipulation;
+  border-radius: 10px; border: 1.5px solid var(--input-ink); color: var(--input-ink);
+  background: transparent; padding: 0 10px; min-height: 36px;
 }
 button:active { background: color-mix(in srgb, var(--input-ink) 16%, transparent); }
 button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-.total {
+.big {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  background: var(--total-bg); color: var(--total-ink);
-  min-height: clamp(76px, 11dvh, 96px); padding: 12px 18px;
+  min-height: var(--big-h); padding: 6px 16px;
 }
-.total .value { gap: 10px; }
-.total .label { font-size: 1.6rem; font-weight: 800; }
-.total .num { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.015em; }
+.big .label { font-size: 1.35rem; font-weight: 800; }
+.big .num { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.015em; }
+.big .value { display: flex; align-items: baseline; gap: 8px; }
+.total { background: var(--total-bg); color: var(--total-ink); }
 .total .unit { color: color-mix(in srgb, var(--total-ink) 72%, transparent); }
+.rest { background: var(--rest-bg); color: var(--rest-ink); border-top: 1px solid var(--line); }
+.rest .unit { color: inherit; opacity: 0.8; }
+.rest.over { background: var(--danger-bg); color: var(--danger); }
 
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.actions button { min-height: 50px; }
+.actions button { min-height: 44px; border-radius: 12px; }
 .actions .copy { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
 .actions .copy:active { background: color-mix(in srgb, var(--total-bg) 82%, black); }
 .actions .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
 .actions .reset.armed { border-color: var(--danger); color: var(--danger); }
 
-.note { margin: 0; padding: 0 4px; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.note { margin: 0; padding: 0 4px; color: var(--muted); font-size: 0.72rem; line-height: 1.3; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Tagesbedarf</h1>
-    <p>kcal pro Tag</p>
+    <span>v1.1.0</span>
   </header>
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
@@ -174,9 +186,19 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
       <button type="button" data-step="50">+50</button>
     </div>
 
-    <div class="total" aria-live="polite">
+    <div class="big total" aria-live="polite">
       <span class="label">Gesamt</span>
       <span class="value"><span class="num" id="out-gesamt">0</span><span class="unit">kcal</span></span>
+    </div>
+
+    <label class="row input" for="essen">
+      <span class="label">Essen eingeplant</span>
+      <span class="value"><input id="essen" data-key="essen" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+    </label>
+
+    <div class="big rest" id="rest-box" aria-live="polite">
+      <span class="label" id="rest-label">Noch zu essen</span>
+      <span class="value"><span class="num" id="out-rest">0</span><span class="unit">kcal</span></span>
     </div>
   </section>
 
@@ -184,14 +206,14 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     <button type="button" class="copy" id="copy">Gesamt kopieren</button>
     <button type="button" class="reset" id="reset">Reset</button>
   </div>
-  <p class="note">Reset setzt Training und Alltag auf 0, Ruheenergie und Surplus bleiben. Gespeichert wird auf diesem Gerät. v1.0.0</p>
+  <p class="note">Reset leert Training, Alltag und Essen. Ruheenergie und Surplus bleiben.</p>
 </main>
 
 <script>
 (function () {
   var STORE_KEY = "tagesbedarf-v1";
-  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 0, surplus: 150 };
-  var RESET_KEYS = ["t1", "t2", "t3", "alltag"];
+  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 0, surplus: 150, essen: 0 };
+  var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
   var KEYS = Object.keys(DEFAULTS);
   var nf = new Intl.NumberFormat("de-DE");
   var state = {};
@@ -217,15 +239,24 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     var aktivitaet = s.t1 + s.t2 + s.t3 + s.alltag;
     var zwischen = s.ruhe + aktivitaet;
     var gesamt = zwischen + s.surplus;
-    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt };
+    var rest = gesamt - s.essen;
+    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest };
   }
   function fmt(n) { return nf.format(Math.round(n)); }
+  function fmtSigned(n) {
+    var r = Math.round(n);
+    return (r < 0 ? "−" : "") + nf.format(Math.abs(r));
+  }
 
   function update() {
     var r = calc(state);
     document.getElementById("out-aktivitaet").textContent = fmt(r.aktivitaet);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
     document.getElementById("out-gesamt").textContent = fmt(r.gesamt);
+    document.getElementById("out-rest").textContent = fmtSigned(r.rest);
+    var over = r.rest < 0;
+    document.getElementById("rest-box").classList.toggle("over", over);
+    document.getElementById("rest-label").textContent = over ? "Über dem Ziel" : "Noch zu essen";
   }
   function writeInputs() {
     KEYS.forEach(function (k) { inputs[k].value = state[k]; });
