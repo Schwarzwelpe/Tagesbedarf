@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tagesbedarf</title>
-<meta name="description" content="Tagesbedarf Rechner: Ruheenergie plus Aktivität plus Surplus, abzüglich geplantem Essen.">
+<title>Tagesplanung</title>
+<meta name="description" content="Tagesplanung: Ruheenergie plus Aktivität plus Surplus, abzüglich geplantem Essen, in drei Slots.">
 <meta name="theme-color" content="#f1f5fa" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e181e" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Tagesbedarf">
+<meta name="apple-mobile-web-app-title" content="Tagesplanung">
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 :root {
-  /* Layout: eine Spalte, alle Zeilen kompakt auf einer Handyseite: Eingaben, Summen, Gesamt, Essen, Rest */
+  /* Layout: eine Spalte, alle Zeilen kompakt, Slot Umschalter als feste Leiste unten */
   --bg: #f1f5fa;
   --surface: #ffffff;
   --ink: #1b2a33;
@@ -34,8 +34,9 @@
   --danger: #b3261e;
   --danger-bg: #fdeceb;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
-  --row-h: clamp(34px, 5.1dvh, 44px);
+  --row-h: clamp(34px, 4.9dvh, 44px);
   --big-h: clamp(54px, 8dvh, 68px);
+  --bar-h: 62px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -66,16 +67,21 @@ body {
   background: var(--bg); color: var(--ink);
   font-family: var(--font); font-variant-numeric: tabular-nums;
   padding:
-    max(10px, env(safe-area-inset-top))
+    max(10px, calc(env(safe-area-inset-top) * 1.4))
     max(14px, env(safe-area-inset-right))
-    max(12px, env(safe-area-inset-bottom))
+    calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px)
     max(14px, env(safe-area-inset-left));
 }
 main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
 header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.015em; }
-header span { color: var(--muted); font-size: 0.75rem; }
+.head-right { display: flex; align-items: center; gap: 10px; }
+.ver { color: var(--muted); font-size: 0.72rem; }
+.pill {
+  background: var(--total-bg); color: var(--total-ink);
+  font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 4px 12px;
+}
 
 .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 
@@ -113,6 +119,7 @@ button {
 }
 button:active { background: color-mix(in srgb, var(--input-ink) 16%, transparent); }
 button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button:disabled { opacity: 0.4; cursor: default; }
 
 .big {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -127,21 +134,32 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .rest .unit { color: inherit; opacity: 0.8; }
 .rest.over { background: var(--danger-bg); color: var(--danger); }
 
-.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .actions button { min-height: 44px; border-radius: 12px; }
 .actions .copy { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
 .actions .copy:active { background: color-mix(in srgb, var(--total-bg) 82%, black); }
 .actions .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
 .actions .reset.armed { border-color: var(--danger); color: var(--danger); }
 
-.note { margin: 0; padding: 0 4px; color: var(--muted); font-size: 0.72rem; line-height: 1.3; }
+
+.slots {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 8px max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+}
+.slots .inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slots button {
+  min-height: 44px; border-radius: 12px; font-size: 1rem;
+  border-color: var(--line); color: var(--muted); background: transparent;
+}
+.slots button[aria-pressed="true"] { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Tagesbedarf</h1>
-    <span>v1.1.0</span>
+    <h1>Tagesplanung</h1>
+    <span class="head-right"><span class="ver">v1.2.0</span><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
@@ -203,37 +221,62 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   </section>
 
   <div class="actions">
-    <button type="button" class="copy" id="copy">Gesamt kopieren</button>
+    <button type="button" class="copy" id="copy">Kopieren</button>
+    <button type="button" id="paste" disabled>Einfügen</button>
     <button type="button" class="reset" id="reset">Reset</button>
   </div>
-  <p class="note">Reset leert Training, Alltag und Essen. Ruheenergie und Surplus bleiben.</p>
 </main>
+
+<nav class="slots" aria-label="Slot wählen">
+  <div class="inner">
+    <button type="button" data-slot="0" aria-pressed="true">Slot 1</button>
+    <button type="button" data-slot="1" aria-pressed="false">Slot 2</button>
+    <button type="button" data-slot="2" aria-pressed="false">Slot 3</button>
+  </div>
+</nav>
 
 <script>
 (function () {
-  var STORE_KEY = "tagesbedarf-v1";
+  var STORE_KEY = "tagesplanung-v2";
+  var OLD_KEY = "tagesbedarf-v1";
   var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 0, surplus: 150, essen: 0 };
   var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
   var KEYS = Object.keys(DEFAULTS);
+  var SLOT_COUNT = 3;
   var nf = new Intl.NumberFormat("de-DE");
-  var state = {};
   var inputs = {};
 
-  KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
+  function sanitize(obj) {
+    var out = {};
+    KEYS.forEach(function (k) {
+      out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : DEFAULTS[k];
+    });
+    return out;
+  }
+
+  var data = { active: 0, slots: [], clip: null };
+  for (var i = 0; i < SLOT_COUNT; i++) data.slots.push(sanitize(null));
 
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      var saved = JSON.parse(raw);
-      KEYS.forEach(function (k) {
-        if (typeof saved[k] === "number" && isFinite(saved[k])) state[k] = saved[k];
-      });
+      if (raw) {
+        var s = JSON.parse(raw);
+        for (var i = 0; i < SLOT_COUNT; i++) data.slots[i] = sanitize(s.slots && s.slots[i]);
+        if (s.active === 0 || s.active === 1 || s.active === 2) data.active = s.active;
+        data.clip = s.clip ? sanitize(s.clip) : null;
+        return;
+      }
+      /* Übernahme der Werte aus Version 1 in Slot 1 */
+      var old = localStorage.getItem(OLD_KEY);
+      if (old) data.slots[0] = sanitize(JSON.parse(old));
     } catch (e) { /* ohne Speicher weiterarbeiten */ }
   }
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* egal */ }
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* egal */ }
   }
+
+  function cur() { return data.slots[data.active]; }
 
   function calc(s) {
     var aktivitaet = s.t1 + s.t2 + s.t3 + s.alltag;
@@ -249,7 +292,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   }
 
   function update() {
-    var r = calc(state);
+    var r = calc(cur());
     document.getElementById("out-aktivitaet").textContent = fmt(r.aktivitaet);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
     document.getElementById("out-gesamt").textContent = fmt(r.gesamt);
@@ -259,14 +302,22 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     document.getElementById("rest-label").textContent = over ? "Über dem Ziel" : "Noch zu essen";
   }
   function writeInputs() {
-    KEYS.forEach(function (k) { inputs[k].value = state[k]; });
+    var s = cur();
+    KEYS.forEach(function (k) { inputs[k].value = s[k]; });
+  }
+  function renderSlots() {
+    document.querySelectorAll("button[data-slot]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(Number(b.dataset.slot) === data.active));
+    });
+    document.getElementById("slot-pill").textContent = "Slot " + (data.active + 1);
+    document.getElementById("paste").disabled = !data.clip;
   }
 
   document.querySelectorAll("input[data-key]").forEach(function (el) {
     inputs[el.dataset.key] = el;
     el.addEventListener("input", function () {
       var v = parseFloat(String(el.value).replace(",", "."));
-      state[el.dataset.key] = isFinite(v) ? v : 0;
+      cur()[el.dataset.key] = isFinite(v) ? v : 0;
       save();
       update();
     });
@@ -276,20 +327,52 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
   document.querySelectorAll("button[data-surplus]").forEach(function (b) {
     b.addEventListener("click", function () {
-      state.surplus = Number(b.dataset.surplus);
-      inputs.surplus.value = state.surplus;
+      cur().surplus = Number(b.dataset.surplus);
+      inputs.surplus.value = cur().surplus;
       save(); update();
     });
   });
   document.querySelectorAll("button[data-step]").forEach(function (b) {
     b.addEventListener("click", function () {
-      state.surplus = state.surplus + Number(b.dataset.step);
-      inputs.surplus.value = state.surplus;
+      cur().surplus = cur().surplus + Number(b.dataset.step);
+      inputs.surplus.value = cur().surplus;
       save(); update();
     });
   });
 
-  /* Reset: zwei Taps, damit er nicht versehentlich auslöst */
+  /* Slots umschalten */
+  document.querySelectorAll("button[data-slot]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var n = Number(b.dataset.slot);
+      if (n === data.active) return;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      disarm();
+      data.active = n;
+      save(); writeInputs(); renderSlots(); update();
+    });
+  });
+
+  function flash(btn, text, back) {
+    btn.textContent = text;
+    setTimeout(function () { btn.textContent = back; }, 1400);
+  }
+
+  /* Kopieren und Einfügen über einen App internen Speicher */
+  var copyBtn = document.getElementById("copy");
+  var pasteBtn = document.getElementById("paste");
+  copyBtn.addEventListener("click", function () {
+    data.clip = sanitize(cur());
+    save(); renderSlots();
+    flash(copyBtn, "Kopiert", "Kopieren");
+  });
+  pasteBtn.addEventListener("click", function () {
+    if (!data.clip) return;
+    data.slots[data.active] = sanitize(data.clip);
+    save(); writeInputs(); update();
+    flash(pasteBtn, "Eingefügt", "Einfügen");
+  });
+
+  /* Reset des aktuellen Slots: zwei Taps, damit er nicht versehentlich auslöst */
   var resetBtn = document.getElementById("reset");
   var armed = false, armTimer = null;
   function disarm() {
@@ -300,33 +383,19 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   resetBtn.addEventListener("click", function () {
     if (!armed) {
       armed = true;
-      resetBtn.textContent = "Wirklich zurücksetzen?";
+      resetBtn.textContent = "Sicher?";
       resetBtn.classList.add("armed");
       armTimer = setTimeout(disarm, 3000);
       return;
     }
     disarm();
-    RESET_KEYS.forEach(function (k) { state[k] = DEFAULTS[k]; });
-    writeInputs(); save(); update();
-  });
-
-  var copyBtn = document.getElementById("copy");
-  copyBtn.addEventListener("click", function () {
-    var text = String(Math.round(calc(state).gesamt));
-    var done = function (msg) {
-      copyBtn.textContent = msg;
-      setTimeout(function () { copyBtn.textContent = "Gesamt kopieren"; }, 1600);
-    };
-    try {
-      navigator.clipboard.writeText(text).then(
-        function () { done("Kopiert: " + text); },
-        function () { done("Kopieren nicht möglich"); }
-      );
-    } catch (e) { done("Kopieren nicht möglich"); }
+    RESET_KEYS.forEach(function (k) { cur()[k] = DEFAULTS[k]; });
+    save(); writeInputs(); update();
   });
 
   load();
   writeInputs();
+  renderSlots();
   update();
 })();
 </script>

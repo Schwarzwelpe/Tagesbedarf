@@ -1,7 +1,7 @@
 {
-  "name": "Tagesbedarf",
-  "short_name": "Tagesbedarf",
-  "description": "Tagesbedarf Rechner: Ruheenergie plus Aktivität plus Surplus.",
+  "name": "Tagesplanung",
+  "short_name": "Tagesplanung",
+  "description": "Tagesplanung: Ruheenergie plus Aktivität plus Surplus, abzüglich geplantem Essen.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",
