@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
+<script>if (window.navigator.standalone) document.documentElement.classList.add("standalone");</script>
 <style>
 :root {
   /* Layout: eine Spalte, alle Zeilen kompakt, Slot Umschalter als feste Leiste unten */
@@ -72,6 +73,12 @@ body {
     calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px)
     max(14px, env(safe-area-inset-left));
 }
+/* Home Bildschirm Modus: iOS meldet dort keinen oberen Sicherheitsabstand, der Titel läge im Unschärfebereich der Statusleiste */
+@media (display-mode: standalone) {
+  body { padding-top: max(48px, calc(env(safe-area-inset-top) * 1.4)); }
+}
+html.standalone body { padding-top: max(48px, calc(env(safe-area-inset-top) * 1.4)); }
+
 main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
@@ -159,7 +166,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><span class="ver">v1.2.0</span><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><span class="ver">v1.2.1</span><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
