@@ -248,7 +248,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.0.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.0.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -264,7 +264,7 @@ td.s-over, td.s-under { font-weight: 700; }
   "use strict";
 
   /* Der Lesezugang sieht nur die Ansichten v_tagesbilanz und v_koerper. Das Passwort steht nicht im Code. */
-  var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
+  var CFG = { host: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
   var CUTTAG_PER_KCAL = 0.0012; /* 1.000 kcal ca. 1,2 Cuttage */
