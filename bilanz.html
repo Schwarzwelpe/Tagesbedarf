@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -463,7 +463,7 @@ td.s-over, td.s-under { font-weight: 700; }
     for (i = days.length - 1; i >= 0; i--) { if (days[i].gruppe === x.gruppe && days[i].kum != null) { lastX = days[i]; break; } }
     var h = '<div class="sheet">';
     h += row("Phase gesamt", sgn(k), "kcal", "calc", esc(x.gruppe) + " · seit " + dm(x.gstart) + " · " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel");
-    h += row(Math.abs(k) < 50 ? "Cuttage" : k > 0 ? "Cuttage dazugekommen" : "Cuttage weggefallen", (Math.abs(k) < 50 ? "0,0" : (k < 0 ? "−" : "+") + cut(k)), "Cuttage", "", "bis " + wd(x.d) + " " + dm(x.d));
+    h += row(Math.abs(k) < 50 ? "Cuttage" : k > 0 ? "Cuttage dazugekommen" : "Cuttage weggefallen", (Math.abs(k) < 50 ? "0,0" : (k < 0 ? "−" : "+") + cut(k)), "Cuttage", "", "netto, über und unter Plan verrechnet, bis " + wd(x.d) + " " + dm(x.d));
     if (lastX && lastX.d !== x.d) h += row("Stand aktuell", sgn(lastX.kum), "kcal", "", "bis " + wd(lastX.d) + " " + dm(lastX.d) + " · ≈ " + cut(lastX.kum) + " Cuttage");
     return h + "</div>";
   }
@@ -498,7 +498,7 @@ td.s-over, td.s-under { font-weight: 700; }
     h += '<div class="t"><b>' + wd(x.d) + " " + dm(x.d) + x.d.slice(0, 4) + '</b>' + chip + '</div>';
     h += '<button type="button" data-nav="1" aria-label="Nächster Tag"' + (idx >= days.length - 1 ? " disabled" : "") + ">›</button></div>";
     if (state) {
-      h += '<div class="hero"><div class="big num s-' + state + '">' + sgn(x.abw) + '</div><div class="state s-' + state + '">' + mark(state) + STATE_TXT[state] + '</div><div class="what">Gegessen minus Ziel in kcal' + (Math.abs(x.abw) >= 50 ? " · ≈ " + cut(x.abw) + " Cuttage" : "") + "</div></div>";
+      h += '<div class="hero"><div class="big num s-' + state + '">' + sgn(x.abw) + '</div><div class="state s-' + state + '">' + mark(state) + STATE_TXT[state] + '</div><div class="what">Gegessen minus Ziel in kcal' + (Math.abs(x.abw) >= 50 ? " · ≈ " + (x.abw > 0 ? "+" : "−") + cut(x.abw) + " Cuttage" + (x.abw > 0 ? " dazu" : " weniger") : "") + "</div></div>";
     } else {
       h += '<div class="hero"><div class="big num">' + (x.saldo != null ? sgn(x.saldo) : "–") + '</div><div class="state">' + (x.essen == null ? "kein Essen gebucht" : "kein Ziel für diese Phase") + '</div><div class="what">Saldo: gegessen minus Verbrauch in kcal</div></div>';
     }
