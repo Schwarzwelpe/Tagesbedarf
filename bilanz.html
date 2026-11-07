@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.2<span id="route"></span></p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.3</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -357,7 +357,7 @@ td.s-over, td.s-under { font-weight: 700; }
   }
   /* Neon erlaubt im Vorab-Check der Browser nicht jeden Header. Darum werden mehrere Wege nacheinander probiert
      (ohne Content-Type, andere Adresse, mit Content-Type) und der funktionierende wird für die nächste Abfrage gemerkt. */
-  var VARIANTS = [[CFG.host, false], [CFG.hostPool, false], [CFG.host, true]];
+  var VARIANTS = [[CFG.host, false]]; /* geprüft 07.11.2026: Weg 1 (direkte Adresse, ohne Content-Type Header) funktioniert, mit Content-Type scheitert Safaris Vorab-Prüfung ("Load failed") */
   var variantIx = 0;
   function post(v, query) {
     var h = { "Neon-Connection-String": conn(v[0]), "Neon-Raw-Text-Output": "true" };
@@ -371,7 +371,6 @@ td.s-over, td.s-under { font-weight: 700; }
     function attempt(i) {
       return post(order[i], query).then(function (r) {
         variantIx = VARIANTS.indexOf(order[i]);
-        var el = document.getElementById("route"); if (el) el.textContent = " · Weg " + (variantIx + 1);
         return r;
       }, function (e) {
         lastErr = e;
@@ -384,7 +383,7 @@ td.s-over, td.s-under { font-weight: 700; }
     return attempt(0).catch(function (e) {
       return new Promise(function (res) { setTimeout(res, 2500); }).then(function () { return attempt(0); });
     }).catch(function (e) {
-      var err = new Error((e && e.message ? e.message : "Netzwerkfehler") + ", " + order.length + " Wege in 2 Runden probiert");
+      var err = new Error((e && e.message ? e.message : "Netzwerkfehler") + ", 2 Versuche");
       throw err;
     });
   }
