@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.2<span id="route"></span></p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -362,18 +362,31 @@ td.s-over, td.s-under { font-weight: 700; }
   function post(v, query) {
     var h = { "Neon-Connection-String": conn(v[0]), "Neon-Raw-Text-Output": "true" };
     if (v[1]) h["Content-Type"] = "application/json";
-    return fetch("https://" + v[0] + "/sql", { method: "POST", headers: h, body: JSON.stringify({ query: query, params: [] }) });
+    var opt = { method: "POST", headers: h, body: JSON.stringify({ query: query, params: [] }) }, timer = null;
+    if (typeof AbortController !== "undefined") { var ac = new AbortController(); opt.signal = ac.signal; timer = setTimeout(function () { ac.abort(); }, 15000); }
+    return fetch("https://" + v[0] + "/sql", opt).then(function (r) { if (timer) clearTimeout(timer); return r; }, function (e) { if (timer) clearTimeout(timer); throw e; });
   }
   function request(query) {
-    var order = VARIANTS.slice(variantIx).concat(VARIANTS.slice(0, variantIx));
+    var order = VARIANTS.slice(variantIx).concat(VARIANTS.slice(0, variantIx)), lastErr = null;
     function attempt(i) {
-      return post(order[i], query).then(function (r) { variantIx = VARIANTS.indexOf(order[i]); return r; }, function (e) {
+      return post(order[i], query).then(function (r) {
+        variantIx = VARIANTS.indexOf(order[i]);
+        var el = document.getElementById("route"); if (el) el.textContent = " · Weg " + (variantIx + 1);
+        return r;
+      }, function (e) {
+        lastErr = e;
         if (i + 1 < order.length) return attempt(i + 1);
-        var err = new Error((e && e.message ? e.message : "Netzwerkfehler") + ", " + order.length + " Wege probiert");
-        throw err;
+        throw e;
       });
     }
-    return attempt(0);
+    /* Die Datenbank schläft nach einigen Minuten ohne Zugriff und braucht beim Aufwecken ein paar Sekunden.
+       Darum nach einem Fehlschlag aller Wege eine zweite Runde nach kurzer Pause. */
+    return attempt(0).catch(function (e) {
+      return new Promise(function (res) { setTimeout(res, 2500); }).then(function () { return attempt(0); });
+    }).catch(function (e) {
+      var err = new Error((e && e.message ? e.message : "Netzwerkfehler") + ", " + order.length + " Wege in 2 Runden probiert");
+      throw err;
+    });
   }
   function sql(query) {
     if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : "body"]);
