@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.3</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.3.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -499,6 +499,27 @@ td.s-over, td.s-under { font-weight: 700; }
     return html;
   }
 
+  function trendSummary(d) {
+    var i, sum7 = 0, n7 = 0, o, mon = isoMonday(d), weeks = [], w, k, full, tot, ws, wsum, html = "";
+    for (i = 0; i < 7; i++) { o = byDate[addDays(d, -i)]; if (o && o.abw != null) { sum7 += o.abw; n7++; } }
+    /* volle Wochen (Mo bis So, alle 7 Tage mit Ziel), die bis zum gewählten Tag zu Ende sind, die jüngsten 4 */
+    for (w = 0; w < 12 && weeks.length < 4; w++) {
+      ws = addDays(mon, -7 * w);
+      if (addDays(ws, 6) > d) continue;
+      full = true; wsum = 0;
+      for (k = 0; k < 7; k++) { o = byDate[addDays(ws, k)]; if (!o || o.abw == null) { full = false; break; } wsum += o.abw; }
+      if (full) weeks.push({ ws: ws, sum: wsum });
+    }
+    function cutTxt(v, per) { return Math.abs(v) >= 50 ? "≈ " + cut(v) + " Cuttage " + (v > 0 ? "über" : "unter") + " Plan" + per : "auf Plan"; }
+    if (n7) html += row("Letzte 7 Tage", sgn(sum7), "kcal", "calc", n7 + " von 7 Tagen bis " + wd(d) + " " + dm(d) + " · " + cutTxt(sum7, ""));
+    if (weeks.length) {
+      tot = 0; weeks.forEach(function (x) { tot += x.sum; });
+      var avg = tot / weeks.length, a = weeks[weeks.length - 1].ws, b = weeks[0].ws;
+      html += row("Ø pro Woche", sgn(avg), "kcal", "calc", (weeks.length === 1 ? "KW " + isoWeek(a) : weeks.length + " volle Wochen, KW " + isoWeek(a) + " bis " + isoWeek(b)) + " · " + cutTxt(avg, ""));
+    }
+    return html ? '<div class="sheet">' + html + "</div>" : "";
+  }
+
   function renderTag() {
     var el = document.getElementById("v-tag");
     if (!days.length) { el.innerHTML = '<div class="info">Noch keine Daten geladen.</div>'; return; }
@@ -531,6 +552,7 @@ td.s-over, td.s-under { font-weight: 700; }
     h += '<div class="legend"><span class="lg-ok">grün: im Ziel (±' + BAND + ')</span><span class="lg-bad">rot: außerhalb</span><span>Balkenhöhe gestaucht, die Zahl ist exakt</span></div></div>';
 
     h += '<div class="sheet">' + weekSummary(x.d) + "</div>";
+    h += trendSummary(x.d);
 
     var last = days[days.length - 1].d, missing = [], t = today(), dd;
     for (dd = addDays(last, 1); dd < t && missing.length < 4; dd = addDays(dd, 1)) missing.push(wd(dd) + " " + dm(dd));
