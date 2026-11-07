@@ -128,6 +128,7 @@ header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.
 .daynav .t { text-align: center; }
 .daynav .t b { font-size: 1.15rem; font-weight: 800; display: block; }
 .daynav .t span { color: var(--muted); font-size: 0.74rem; }
+.daynav .t span.chip { display: inline-block; margin-top: 5px; padding: 4px 14px; border-radius: 14px; background: var(--calc-row); color: var(--ink); font-weight: 700; font-size: 0.76rem; line-height: 1.35; }
 .daynav button { min-height: 44px; font-size: 1.3rem; border-radius: 12px; }
 
 .hero { padding: 6px 16px 14px; text-align: center; }
@@ -265,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.1.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.1.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -480,7 +481,9 @@ td.s-over, td.s-under { font-weight: 700; }
     var x = byDate[st.sel], idx = days.indexOf(x), bd = bodyBy[st.sel], h = "";
     var state = stateOf(x.abw);
     h += '<div class="sheet"><div class="daynav"><button type="button" data-nav="-1" aria-label="Vorheriger Tag"' + (idx <= 0 ? " disabled" : "") + '>‹</button>';
-    h += '<div class="t"><b>' + wd(x.d) + " " + dm(x.d) + x.d.slice(0, 4) + '</b><span>' + esc(x.phase || "") + '</span></div>';
+    var rule = x.stufe != null ? "Stufe " + sgn(x.stufe) : x.ziel != null ? "festes Ziel " + fmt(x.ziel) : "";
+    var chip = (x.phase || rule) ? '<span class="chip">' + esc(x.phase || "Ohne Phase") + (rule ? "<br>" + rule : "") + "</span>" : "";
+    h += '<div class="t"><b>' + wd(x.d) + " " + dm(x.d) + x.d.slice(0, 4) + '</b>' + chip + '</div>';
     h += '<button type="button" data-nav="1" aria-label="Nächster Tag"' + (idx >= days.length - 1 ? " disabled" : "") + ">›</button></div>";
     if (state) {
       h += '<div class="hero"><div class="big num s-' + state + '">' + sgn(x.abw) + '</div><div class="state s-' + state + '">' + mark(state) + STATE_TXT[state] + '</div><div class="what">Gegessen minus Ziel in kcal' + (Math.abs(x.abw) >= 50 ? " · ≈ " + cut(x.abw) + " Cuttage" : "") + "</div></div>";
@@ -489,8 +492,8 @@ td.s-over, td.s-under { font-weight: 700; }
     }
     h += row("Ruheenergie", fmt(x.ruhe), "kcal", "", "Apple Watch");
     h += row("Aktivität", fmt(x.aktiv), "kcal", "", "Alltag " + fmt(x.alltag) + " · Workouts " + fmt(x.workouts) + (x.wn ? " (" + x.wn + ")" : ""));
-    if (x.stufe != null) h += row("Stufe", sgn(x.stufe), "kcal");
-    h += row("Ziel", fmt(x.ziel), "kcal", "calc");
+    if (x.stufe != null) h += row("Stufe", sgn(x.stufe), "kcal", "", wd(x.d) === "Sa" || wd(x.d) === "So" ? "Wochenende" : "Mo bis Fr");
+    h += row("Ziel", fmt(x.ziel), "kcal", "calc", x.ziel == null ? "" : x.stufe != null ? "Verbrauch " + fmt(x.verbrauch) + " + Stufe " + sgn(x.stufe) : "festes Ziel dieser Phase");
     h += row("Gegessen", fmt(x.essen), "kcal", "calc");
     h += row("Saldo", x.saldo != null ? sgn(x.saldo) : "–", "kcal", "", "gegessen minus Verbrauch " + fmt(x.verbrauch));
     h += row("Eiweiß · KH · Fett", (x.p != null ? fmt(x.p) : "–") + " · " + (x.k != null ? fmt(x.k) : "–") + " · " + (x.f != null ? fmt(x.f) : "–"), "g");
