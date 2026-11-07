@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.2</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.3</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -510,24 +510,6 @@ td.s-over, td.s-under { font-weight: 700; }
     return h + "</div>";
   }
 
-  function weekSummary(d) {
-    var mon = isoMonday(d), list = [], i, sum = 0, n = 0, essen = 0, ne = 0, over = 0;
-    for (i = 0; i < 7; i++) list.push(addDays(mon, i));
-    list.forEach(function (x) {
-      var o = byDate[x];
-      if (o && o.abw != null) { sum += o.abw; n++; }
-      if (o && o.essen != null) { essen += o.essen; ne++; }
-    });
-    var sun = addDays(mon, 6);
-    var html = '<div class="row"><span class="label">KW ' + isoWeek(d) + '<small>' + wd(mon) + " " + dm(mon) + " bis " + wd(sun) + " " + dm(sun) + "</small></span><span class=\"value\"><span class=\"unit\">" + n + " von 7 Tagen</span></span></div>";
-    if (n) {
-      html += row("Ø gegessen pro Tag", fmt(ne ? essen / ne : null), "kcal");
-    } else {
-      html += '<div class="row"><span class="sub">Für diese Woche liegen noch keine abgeschlossenen Tage vor.</span></div>';
-    }
-    return html;
-  }
-
   function renderTag() {
     var el = document.getElementById("v-tag");
     if (!days.length) { el.innerHTML = '<div class="info">Noch keine Daten geladen.</div>'; return; }
@@ -559,7 +541,6 @@ td.s-over, td.s-under { font-weight: 700; }
     h += '<div class="sheet"><div class="readout" id="ro-bars" aria-live="polite">' + readoutFor(st.sel) + '</div><div class="chart" id="bars">' + barsSVG(endD) + "</div>";
     h += '<div class="legend"><span class="lg-ok">grün: im Ziel (±' + BAND + ')</span><span class="lg-bad">rot: außerhalb</span><span>Balkenhöhe gestaucht, die Zahl ist exakt</span></div></div>';
 
-    h += '<div class="sheet">' + weekSummary(x.d) + "</div>";
 
     var last = days[days.length - 1].d, missing = [], t = today(), dd;
     for (dd = addDays(last, 1); dd < t && missing.length < 4; dd = addDays(dd, 1)) missing.push(wd(dd) + " " + dm(dd));
