@@ -105,6 +105,7 @@ header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.
   font: 800 0.74rem var(--font); border-radius: 999px; padding: 6px 12px; min-height: 0;
 }
 .pill.err { background: var(--danger); }
+.jump { display: block; margin: 6px auto 0; padding: 5px 14px; font: 700 0.78rem var(--font); color: var(--input-ink); background: none; border: 1.5px solid var(--input-ink); border-radius: 999px; min-height: 0; }
 
 .sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .pad { padding: 14px 16px; }
@@ -267,7 +268,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.5.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.5.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -521,6 +522,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     var chip = (x.phase || rule) ? '<span class="chip">' + esc(x.phase || "Ohne Phase") + (rule ? "<br>" + rule : "") + "</span>" : "";
     h += '<div class="t"><b>' + wd(x.d) + " " + dm(x.d) + x.d.slice(0, 4) + '</b>' + chip + '</div>';
     h += '<button type="button" data-nav="1" aria-label="Nächster Tag"' + (idx >= days.length - 1 ? " disabled" : "") + ">›</button></div>";
+    if (idx < days.length - 1) h += '<button type="button" class="jump" data-last="tag">Zum letzten Tag · ' + wd(days[days.length - 1].d) + " " + dm(days[days.length - 1].d) + "</button>";
     if (state) {
       h += '<div class="hero"><div class="big num s-' + state + '">' + sgn(x.abw) + '</div><div class="state s-' + state + '">' + mark(state) + STATE_TXT[state] + '</div><div class="what">Gegessen minus Ziel in kcal' + (Math.abs(x.abw) >= 50 ? " · ≈ " + (x.abw > 0 ? "+" : "−") + cut(x.abw) + " Cuttage" + (x.abw > 0 ? " dazu" : " weniger") : "") + "</div></div>";
     } else {
@@ -557,6 +559,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     var first = ym + "-01", lead = (pd(first).getDay() + 6) % 7, dim = new Date(y, mo, 0).getDate(), t = today(), i;
     var minM = days[0].d.slice(0, 7), maxM = days[days.length - 1].d.slice(0, 7);
     var h = '<div class="sheet"><div class="monthnav"><button type="button" data-month="-1" aria-label="Vorheriger Monat"' + (ym <= minM ? " disabled" : "") + '>‹</button><div class="t">' + MONTHS[mo - 1] + " " + y + '</div><button type="button" data-month="1" aria-label="Nächster Monat"' + (ym >= maxM ? " disabled" : "") + ">›</button></div>";
+    if (ym !== maxM) h += '<button type="button" class="jump" data-last="monat">Zum aktuellen Monat · ' + MONTHS[+maxM.slice(5, 7) - 1] + "</button>";
     h += '<div class="cal">';
     ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].forEach(function (w) { h += '<div class="wh">' + w + "</div>"; });
     for (i = 0; i < lead; i++) h += "<div></div>";
@@ -678,8 +681,12 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   /* ---------- Ereignisse ---------- */
   document.addEventListener("click", function (ev) {
-    var t = ev.target.closest ? ev.target.closest("[data-tab],[data-nav],[data-month],[data-range],[data-sel]") : null;
+    var t = ev.target.closest ? ev.target.closest("[data-tab],[data-nav],[data-month],[data-range],[data-sel],[data-last]") : null;
     if (!t) return;
+    if (t.dataset.last) {
+      if (days.length) { st.sel = days[days.length - 1].d; st.month = st.sel.slice(0, 7); render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } }
+      return;
+    }
     if (t.dataset.tab) { go(t.dataset.tab); return; }
     if (t.dataset.nav) {
       var i = days.indexOf(byDate[st.sel]) + Number(t.dataset.nav);
