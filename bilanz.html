@@ -223,6 +223,7 @@ th:first-child, td:first-child { text-align: left; padding-left: 16px; }
 th:last-child, td:last-child { padding-right: 16px; }
 tr[data-sel] { cursor: pointer; }
 td.s-over, td.s-under { font-weight: 700; }
+tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
 .foot { color: var(--muted); font-size: 0.72rem; text-align: center; margin: 6px 0 0; }
 .foot button { min-height: 30px; font-size: 0.72rem; border-color: var(--line); color: var(--muted); }
@@ -266,7 +267,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.3</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.5.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -568,21 +569,21 @@ td.s-over, td.s-under { font-weight: 700; }
     h += "</div>";
     h += '<div class="legend"><span class="lg-ok">grün: im Ziel (±' + BAND + ')</span><span class="lg-bad">rot: außerhalb</span><span>Zahl = Gegessen minus Ziel in kcal</span></div></div>';
 
-    var md = monthDays(ym), sum = 0, n = 0, essen = 0, ne = 0, nOk = 0;
+    var md = monthDays(ym), sum = 0, n = 0, sE = 0, sZ = 0, nOk = 0;
     md.forEach(function (x) {
-      if (x.abw != null) { sum += x.abw; n++; if (Math.abs(x.abw) <= BAND) nOk++; }
-      if (x.essen != null) { essen += x.essen; ne++; }
+      if (x.abw != null) { sum += x.abw; n++; sE += x.essen; sZ += x.ziel; if (Math.abs(x.abw) <= BAND) nOk++; }
     });
     h += '<div class="sheet">';
-    h += row("Tage mit Ziel", n ? n + " (davon " + nOk + " im Ziel)" : "–", "");
-    if (n) h += row("Abweichung Summe", sgn(sum), "kcal", "calc", Math.abs(sum) >= 50 ? "≈ " + cut(sum) + " Cuttage " + (sum > 0 ? "über" : "unter") + " Plan" : "auf Plan");
-    h += row("Ø gegessen pro Tag", ne ? fmt(essen / ne) : "–", "kcal");
+    if (n) h += row("Im Ziel", nOk + " von " + n + " Tagen", "", "", "±" + BAND + " kcal um das Ziel");
+    if (n) h += row("Abweichung Summe", sgn(sum), "kcal", "calc", "Kalendermonat, alle Phasen zusammen" + (Math.abs(sum) >= 50 ? " · ≈ " + cut(sum) + " Cuttage " + (sum > 0 ? "über" : "unter") + " Plan" : " · auf Plan"));
     h += '<details><summary>Tabelle anzeigen</summary><table><thead><tr><th>Tag</th><th>Gegessen</th><th>Ziel</th><th>Abw.</th></tr></thead><tbody>';
     md.slice().reverse().forEach(function (x) {
       var s = stateOf(x.abw);
       h += '<tr data-sel="' + x.d + '" data-goto="tag"><td>' + wd(x.d) + " " + dm(x.d) + "</td><td>" + fmt(x.essen) + "</td><td>" + fmt(x.ziel) + '</td><td class="' + (s && s !== "ok" ? "s-" + s : "") + '">' + (x.abw != null ? sgn(x.abw) : "–") + "</td></tr>";
     });
-    h += "</tbody></table></details></div>";
+    h += "</tbody>";
+    if (n) h += "<tfoot><tr><td>Summe</td><td>" + fmt(sE) + "</td><td>" + fmt(sZ) + "</td><td>" + sgn(sum) + "</td></tr></tfoot>";
+    h += "</table></details></div>";
     el.innerHTML = h;
   }
 
