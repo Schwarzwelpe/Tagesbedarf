@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.2</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -521,7 +521,6 @@ td.s-over, td.s-under { font-weight: 700; }
     var sun = addDays(mon, 6);
     var html = '<div class="row"><span class="label">KW ' + isoWeek(d) + '<small>' + wd(mon) + " " + dm(mon) + " bis " + wd(sun) + " " + dm(sun) + "</small></span><span class=\"value\"><span class=\"unit\">" + n + " von 7 Tagen</span></span></div>";
     if (n) {
-      html += row("Abweichung Summe", sgn(sum), "kcal", "calc", Math.abs(sum) >= 50 ? "≈ " + cut(sum) + " Cuttage " + (sum > 0 ? "über" : "unter") + " Plan" : "auf Plan");
       html += row("Ø gegessen pro Tag", fmt(ne ? essen / ne : null), "kcal");
     } else {
       html += '<div class="row"><span class="sub">Für diese Woche liegen noch keine abgeschlossenen Tage vor.</span></div>';
