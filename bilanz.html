@@ -248,7 +248,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.0.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.0.2</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -264,7 +264,7 @@ td.s-over, td.s-under { font-weight: 700; }
   "use strict";
 
   /* Der Lesezugang sieht nur die Ansichten v_tagesbilanz und v_koerper. Das Passwort steht nicht im Code. */
-  var CFG = { host: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
+  var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", hostPool: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
   var CUTTAG_PER_KCAL = 0.0012; /* 1.000 kcal ca. 1,2 Cuttage */
@@ -333,16 +333,32 @@ td.s-over, td.s-under { font-weight: 700; }
   function mark(state) { return '<span class="mk ' + state + '" aria-hidden="true"></span>'; }
 
   /* ---------- Abfrage ---------- */
-  function conn() {
-    return "postgresql://" + CFG.user + ":" + encodeURIComponent(lsGet(KEY_PW) || "") + "@" + CFG.host + "/" + CFG.db + "?sslmode=require";
+  function conn(host) {
+    return "postgresql://" + CFG.user + ":" + encodeURIComponent(lsGet(KEY_PW) || "") + "@" + host + "/" + CFG.db + "?sslmode=require";
+  }
+  /* Neon erlaubt im Vorab-Check der Browser nicht jeden Header. Darum werden mehrere Wege nacheinander probiert
+     (ohne Content-Type, andere Adresse, mit Content-Type) und der funktionierende wird für die nächste Abfrage gemerkt. */
+  var VARIANTS = [[CFG.host, false], [CFG.hostPool, false], [CFG.host, true]];
+  var variantIx = 0;
+  function post(v, query) {
+    var h = { "Neon-Connection-String": conn(v[0]), "Neon-Raw-Text-Output": "true" };
+    if (v[1]) h["Content-Type"] = "application/json";
+    return fetch("https://" + v[0] + "/sql", { method: "POST", headers: h, body: JSON.stringify({ query: query, params: [] }) });
+  }
+  function request(query) {
+    var order = VARIANTS.slice(variantIx).concat(VARIANTS.slice(0, variantIx));
+    function attempt(i) {
+      return post(order[i], query).then(function (r) { variantIx = VARIANTS.indexOf(order[i]); return r; }, function (e) {
+        if (i + 1 < order.length) return attempt(i + 1);
+        var err = new Error((e && e.message ? e.message : "Netzwerkfehler") + ", " + order.length + " Wege probiert");
+        throw err;
+      });
+    }
+    return attempt(0);
   }
   function sql(query) {
     if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : "body"]);
-    return fetch("https://" + CFG.host + "/sql", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Neon-Connection-String": conn(), "Neon-Raw-Text-Output": "true" },
-      body: JSON.stringify({ query: query, params: [] })
-    }).then(function (r) {
+    return request(query).then(function (r) {
       if (!r.ok) {
         return r.text().then(function (t) { var e = new Error(t.slice(0, 200)); e.status = r.status; throw e; });
       }
