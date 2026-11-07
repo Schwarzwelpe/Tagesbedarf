@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.3.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -285,10 +285,13 @@ td.s-over, td.s-under { font-weight: 700; }
   var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", hostPool: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
-  var CUTTAG_PER_KCAL = 0.0012; /* 1.000 kcal ca. 1,2 Cuttage */
+  var P = { kgCut: 0.115, kg1000: 0.14 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
+  var SOLL = {};                          /* je Gruppe: Plan Fettzuwachs, Altlast, Winter (v_gruppe_soll) */
   var MINUS = "−";
 
   var Q_DAYS = "select to_char(log_date,'YYYY-MM-DD') as d, phase_name, ruhe::float8 as ruhe, aktiv::float8 as aktiv, workouts::float8 as workouts, alltag::float8 as alltag, workouts_n::int as workouts_n, gegessen::float8 as gegessen, protein_g::float8 as protein_g, carbs_g::float8 as carbs_g, fat_g::float8 as fat_g, verbrauch::float8 as verbrauch, saldo::float8 as saldo, stufe::float8 as stufe, ziel::float8 as ziel, gruppe, abw_kum::float8 as abw_kum, tage_kum::int as tage_kum, to_char(gruppe_start,'YYYY-MM-DD') as gruppe_start from v_tagesbilanz order by log_date";
+  var Q_PARAM = "select key, value from v_parameter";
+  var Q_SOLL = "select gruppe, soll_fett_kg, altlast_kg, winter_kg, fuer_cut from v_gruppe_soll";
   var Q_BODY = "select to_char(metric_date,'YYYY-MM-DD') as d, weight_kg::float8 as kg, waist_cm::float8 as taille, abdomen_cm::float8 as bauch from v_koerper order by metric_date";
 
   /* ---------- Formatierung ---------- */
@@ -298,7 +301,10 @@ td.s-over, td.s-under { font-weight: 700; }
   function sgn(n) { var r = Math.round(n); return r > 0 ? "+" + nf0.format(r) : r < 0 ? MINUS + nf0.format(-r) : "0"; }
   function f1(n) { if (n == null) return "–"; return (n < 0 ? MINUS : "") + nf1.format(Math.abs(n)); }
   function sg1(n) { var r = Math.round(n * 10) / 10; return (r > 0 ? "+" : r < 0 ? MINUS : "") + nf1.format(Math.abs(r)); }
-  function cut(kcal) { return nf1.format(Math.abs(kcal) * CUTTAG_PER_KCAL); }
+  function cf() { return P.kg1000 / 1000 / P.kgCut; }   /* Cuttage pro kcal, aus kg pro 1.000 kcal und kg pro Cuttag */
+  function cut(kcal) { return nf1.format(Math.abs(kcal) * cf()); }
+  function sc(v) { var r = Math.round(v * 10) / 10; return (r < 0 ? MINUS : "+") + nf1.format(Math.abs(r)); }
+  var nf2 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
   /* ---------- Datum ---------- */
@@ -328,7 +334,7 @@ td.s-over, td.s-under { font-weight: 700; }
   var st = { tab: "tag", sel: null, month: null, range: 28, hover: null, wsel: null };
 
   function num(v) { return v == null || v === "" ? null : Number(v); }
-  function setData(rows, brows, stamp) {
+  function setData(rows, brows, stamp, par, soll) {
     days = rows.map(function (r) {
       var o = {
         d: r.d, phase: r.phase_name, ruhe: num(r.ruhe), aktiv: num(r.aktiv), workouts: num(r.workouts), alltag: num(r.alltag),
@@ -342,6 +348,8 @@ td.s-over, td.s-under { font-weight: 700; }
     byDate = {}; days.forEach(function (x) { byDate[x.d] = x; });
     body = brows.map(function (r) { return { d: r.d, kg: num(r.kg), taille: num(r.taille), bauch: num(r.bauch) }; });
     bodyBy = {}; body.forEach(function (x) { bodyBy[x.d] = x; });
+    if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); });
+    if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, winter: num(r.winter_kg) || 0, fuer: r.fuer_cut || null }; }); }
     fetchedAt = stamp || Date.now();
     if (days.length && (!st.sel || !byDate[st.sel])) st.sel = days[days.length - 1].d;
     if (!st.month && st.sel) st.month = st.sel.slice(0, 7);
@@ -388,7 +396,7 @@ td.s-over, td.s-under { font-weight: 700; }
     });
   }
   function sql(query) {
-    if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : "body"]);
+    if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : query === Q_BODY ? "body" : query === Q_PARAM ? "param" : "soll"] || []);
     return request(query).then(function (r) {
       if (!r.ok) {
         return r.text().then(function (t) { var e = new Error(t.slice(0, 200)); e.status = r.status; throw e; });
@@ -469,13 +477,35 @@ td.s-over, td.s-under { font-weight: 700; }
     return s + "</svg>";
   }
 
+  function lastKum(g) {
+    for (var i = days.length - 1; i >= 0; i--) { if (days[i].gruppe === g && days[i].kum != null) return days[i].kum; }
+    return 0;
+  }
   function phaseSummary(x) {
     if (!x.gruppe || x.kum == null) return "";
-    var lastX = null, i, k = x.kum;
+    var lastX = null, i, k = x.kum, fac = cf(), kgC = P.kgCut, s = SOLL[x.gruppe], quellen = [], g, bis = "bis " + wd(x.d) + " " + dm(x.d);
     for (i = days.length - 1; i >= 0; i--) { if (days[i].gruppe === x.gruppe && days[i].kum != null) { lastX = days[i]; break; } }
+    for (g in SOLL) { if (SOLL[g].fuer === x.gruppe) quellen.push(g); }
     var h = '<div class="sheet">';
     h += row("Phase gesamt", sgn(k), "kcal", "calc", esc(x.gruppe) + " · seit " + dm(x.gstart) + " · " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel");
-    h += row(Math.abs(k) < 50 ? "Cuttage" : k > 0 ? "Cuttage dazugekommen" : "Cuttage weggefallen", (Math.abs(k) < 50 ? "0,0" : (k < 0 ? "−" : "+") + cut(k)), "Cuttage", "", "netto, über und unter Plan verrechnet, bis " + wd(x.d) + " " + dm(x.d));
+    if (s) {
+      /* Aufbau: Plan plus Drift plus Altlast ergibt die Cuttage, die der nächste Cut abarbeiten muss */
+      var plan = s.fett / kgC, drift = k * fac, alt = s.alt / kgC, tot = plan + drift + alt, wi = s.winter / kgC;
+      h += row("Cuttage Plan", nf1.format(plan), "Cuttage", "", nf2.format(s.fett) + " kg Fett, Plan dieser Phase");
+      h += row("Cuttage Drift", sc(drift), "Cuttage", "", "netto, über und unter Plan verrechnet, " + bis);
+      if (s.alt > 0) h += row("Cuttage Altlast", nf1.format(alt), "Cuttage", "", nf2.format(s.alt) + " kg Rest aus der Vorphase");
+      h += row("Erforderlich" + (s.fuer ? " für " + esc(s.fuer) : ""), nf1.format(tot), "Cuttage", "calc", "ohne Winter" + (wi > 0 ? " · mit Winterbudget +" + nf1.format(wi) + " = " + nf1.format(tot + wi) : ""));
+    } else if (quellen.length) {
+      /* Cut: erforderlich aus den Aufbauphasen, geleistet aus den eigenen Cut Tagen */
+      var erf = 0, ew = 0;
+      quellen.forEach(function (q) { var o = SOLL[q]; erf += (o.alt + o.fett) / kgC + lastKum(q) * fac; ew += o.winter / kgC; });
+      var gel = x.nk - k * fac, offen = erf - gel;
+      h += row("Cuttage erforderlich", nf1.format(erf), "Cuttage", "", "aus " + quellen.map(esc).join(", ") + " samt Drift" + (ew > 0 ? " · Winter separat +" + nf1.format(ew) : ""));
+      h += row("Cuttage geleistet", nf1.format(gel), "Cuttage", "", x.nk + (x.nk === 1 ? " Cut Tag" : " Cut Tage") + ", netto, " + bis);
+      h += row(offen > 0 ? "Noch offen" : "Kür Tage", nf1.format(Math.abs(offen)), "Cuttage", "calc", offen > 0 ? "bis die Altlast abgebaut ist" : "über die Altlast hinaus");
+    } else {
+      h += row(Math.abs(k) < 50 ? "Cuttage" : k > 0 ? "Cuttage dazugekommen" : "Cuttage weggefallen", (Math.abs(k) < 50 ? "0,0" : (k < 0 ? "−" : "+") + cut(k)), "Cuttage", "", "netto, über und unter Plan verrechnet, " + bis);
+    }
     if (lastX && lastX.d !== x.d) h += row("Stand aktuell", sgn(lastX.kum), "kcal", "", "bis " + wd(lastX.d) + " " + dm(lastX.d) + " · ≈ " + cut(lastX.kum) + " Cuttage");
     return h + "</div>";
   }
@@ -497,27 +527,6 @@ td.s-over, td.s-under { font-weight: 700; }
       html += '<div class="row"><span class="sub">Für diese Woche liegen noch keine abgeschlossenen Tage vor.</span></div>';
     }
     return html;
-  }
-
-  function trendSummary(d) {
-    var i, sum7 = 0, n7 = 0, o, mon = isoMonday(d), weeks = [], w, k, full, tot, ws, wsum, html = "";
-    for (i = 0; i < 7; i++) { o = byDate[addDays(d, -i)]; if (o && o.abw != null) { sum7 += o.abw; n7++; } }
-    /* volle Wochen (Mo bis So, alle 7 Tage mit Ziel), die bis zum gewählten Tag zu Ende sind, die jüngsten 4 */
-    for (w = 0; w < 12 && weeks.length < 4; w++) {
-      ws = addDays(mon, -7 * w);
-      if (addDays(ws, 6) > d) continue;
-      full = true; wsum = 0;
-      for (k = 0; k < 7; k++) { o = byDate[addDays(ws, k)]; if (!o || o.abw == null) { full = false; break; } wsum += o.abw; }
-      if (full) weeks.push({ ws: ws, sum: wsum });
-    }
-    function cutTxt(v, per) { return Math.abs(v) >= 50 ? "≈ " + cut(v) + " Cuttage " + (v > 0 ? "über" : "unter") + " Plan" + per : "auf Plan"; }
-    if (n7) html += row("Letzte 7 Tage", sgn(sum7), "kcal", "calc", n7 + " von 7 Tagen bis " + wd(d) + " " + dm(d) + " · " + cutTxt(sum7, ""));
-    if (weeks.length) {
-      tot = 0; weeks.forEach(function (x) { tot += x.sum; });
-      var avg = tot / weeks.length, a = weeks[weeks.length - 1].ws, b = weeks[0].ws;
-      html += row("Ø pro Woche", sgn(avg), "kcal", "calc", (weeks.length === 1 ? "KW " + isoWeek(a) : weeks.length + " volle Wochen, KW " + isoWeek(a) + " bis " + isoWeek(b)) + " · " + cutTxt(avg, ""));
-    }
-    return html ? '<div class="sheet">' + html + "</div>" : "";
   }
 
   function renderTag() {
@@ -552,7 +561,6 @@ td.s-over, td.s-under { font-weight: 700; }
     h += '<div class="legend"><span class="lg-ok">grün: im Ziel (±' + BAND + ')</span><span class="lg-bad">rot: außerhalb</span><span>Balkenhöhe gestaucht, die Zahl ist exakt</span></div></div>';
 
     h += '<div class="sheet">' + weekSummary(x.d) + "</div>";
-    h += trendSummary(x.d);
 
     var last = days[days.length - 1].d, missing = [], t = today(), dd;
     for (dd = addDays(last, 1); dd < t && missing.length < 4; dd = addDays(dd, 1)) missing.push(wd(dd) + " " + dm(dd));
@@ -758,7 +766,7 @@ td.s-over, td.s-under { font-weight: 700; }
   /* ---------- Laden ---------- */
   function loadCache() {
     var raw = lsGet(KEY_CACHE); if (!raw) return false;
-    try { var c = JSON.parse(raw); if (c && c.days && c.body) { setData(c.days, c.body, c.t); return true; } } catch (e) { /* egal */ }
+    try { var c = JSON.parse(raw); if (c && c.days && c.body) { setData(c.days, c.body, c.t, c.param, c.soll); return true; } } catch (e) { /* egal */ }
     return false;
   }
   var inflight = false;
@@ -766,11 +774,12 @@ td.s-over, td.s-under { font-weight: 700; }
     if (inflight) return;
     if (!lsGet(KEY_PW) && !window.__BILANZ_MOCK__) { showSetup(""); setStand("kein Zugang", true); return; }
     inflight = true; setStand("lädt …", false);
-    Promise.all([sql(Q_DAYS), sql(Q_BODY)]).then(function (r) {
+    var soft = function (q) { return sql(q).catch(function () { return null; }); }; /* Planwerte sind Beiwerk, fehlen sie, läuft der Rest trotzdem */
+    Promise.all([sql(Q_DAYS), sql(Q_BODY), soft(Q_PARAM), soft(Q_SOLL)]).then(function (r) {
       inflight = false;
       var now = Date.now();
-      lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1] }));
-      setData(r[0], r[1], now);
+      lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1], param: r[2], soll: r[3] }));
+      setData(r[0], r[1], now, r[2], r[3]);
       infoEl.hidden = true;
       setStand("Stand " + clock(now), false); render();
     }).catch(function (e) {
