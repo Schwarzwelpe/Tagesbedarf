@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.4.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -286,12 +286,12 @@ td.s-over, td.s-under { font-weight: 700; }
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
   var P = { kgCut: 0.115, kg1000: 0.14 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
-  var SOLL = {};                          /* je Gruppe: Plan Fettzuwachs, Altlast, Winter (v_gruppe_soll) */
+  var SOLL = {};                          /* je Gruppe: Plan Fettzuwachs, Altlast, Cut Tage (v_gruppe_soll) */
   var MINUS = "−";
 
   var Q_DAYS = "select to_char(log_date,'YYYY-MM-DD') as d, phase_name, ruhe::float8 as ruhe, aktiv::float8 as aktiv, workouts::float8 as workouts, alltag::float8 as alltag, workouts_n::int as workouts_n, gegessen::float8 as gegessen, protein_g::float8 as protein_g, carbs_g::float8 as carbs_g, fat_g::float8 as fat_g, verbrauch::float8 as verbrauch, saldo::float8 as saldo, stufe::float8 as stufe, ziel::float8 as ziel, gruppe, abw_kum::float8 as abw_kum, tage_kum::int as tage_kum, to_char(gruppe_start,'YYYY-MM-DD') as gruppe_start from v_tagesbilanz order by log_date";
   var Q_PARAM = "select key, value from v_parameter";
-  var Q_SOLL = "select gruppe, soll_fett_kg, altlast_kg, winter_kg, fuer_cut from v_gruppe_soll";
+  var Q_SOLL = "select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll";
   var Q_BODY = "select to_char(metric_date,'YYYY-MM-DD') as d, weight_kg::float8 as kg, waist_cm::float8 as taille, abdomen_cm::float8 as bauch from v_koerper order by metric_date";
 
   /* ---------- Formatierung ---------- */
@@ -349,7 +349,7 @@ td.s-over, td.s-under { font-weight: 700; }
     body = brows.map(function (r) { return { d: r.d, kg: num(r.kg), taille: num(r.taille), bauch: num(r.bauch) }; });
     bodyBy = {}; body.forEach(function (x) { bodyBy[x.d] = x; });
     if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); });
-    if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, winter: num(r.winter_kg) || 0, fuer: r.fuer_cut || null }; }); }
+    if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, cut: num(r.cut_tage) || 0, fuer: r.fuer_cut || null }; }); }
     fetchedAt = stamp || Date.now();
     if (days.length && (!st.sel || !byDate[st.sel])) st.sel = days[days.length - 1].d;
     if (!st.month && st.sel) st.month = st.sel.slice(0, 7);
@@ -489,18 +489,18 @@ td.s-over, td.s-under { font-weight: 700; }
     var h = '<div class="sheet">';
     h += row("Phase gesamt", sgn(k), "kcal", "calc", esc(x.gruppe) + " · seit " + dm(x.gstart) + " · " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel");
     if (s) {
-      /* Aufbau: Plan plus Drift plus Altlast ergibt die Cuttage, die der nächste Cut abarbeiten muss */
-      var plan = s.fett / kgC, drift = k * fac, alt = s.alt / kgC, tot = plan + drift + alt, wi = s.winter / kgC;
-      h += row("Cuttage Plan", nf1.format(plan), "Cuttage", "", nf2.format(s.fett) + " kg Fett, Plan dieser Phase");
+      /* Aufbau: Plan (inklusive Altlast) plus Drift ergibt die Cuttage, die der nächste Cut abarbeiten muss */
+      var plan = (s.fett + s.alt) / kgC, drift = k * fac, tot = plan + drift;
+      h += row("Cuttage Plan", nf1.format(plan), "Cuttage", "", nf2.format(s.fett + s.alt) + " kg Fett: Plan " + nf2.format(s.fett) + (s.alt > 0 ? " plus Altlast " + nf2.format(s.alt) : ""));
       h += row("Cuttage Drift", sc(drift), "Cuttage", "", "netto, über und unter Plan verrechnet, " + bis);
-      if (s.alt > 0) h += row("Cuttage Altlast", nf1.format(alt), "Cuttage", "", nf2.format(s.alt) + " kg Rest aus der Vorphase");
-      h += row("Erforderlich" + (s.fuer ? " für " + esc(s.fuer) : ""), nf1.format(tot), "Cuttage", "calc", "ohne Winter" + (wi > 0 ? " · mit Winterbudget +" + nf1.format(wi) + " = " + nf1.format(tot + wi) : ""));
+      h += row("Erforderlich" + (s.fuer ? " für " + esc(s.fuer) : ""), nf1.format(tot), "Cuttage", "calc", "Plan plus Drift");
+      if (s.cut > 0) h += row("Kür Tage" + (s.fuer ? " in " + esc(s.fuer) : ""), nf1.format(Math.max(0, s.cut - tot)), "Tage", "calc", "bei " + s.cut + " Cut Tagen, weniger je mehr Drift");
     } else if (quellen.length) {
       /* Cut: erforderlich aus den Aufbauphasen, geleistet aus den eigenen Cut Tagen */
-      var erf = 0, ew = 0;
-      quellen.forEach(function (q) { var o = SOLL[q]; erf += (o.alt + o.fett) / kgC + lastKum(q) * fac; ew += o.winter / kgC; });
+      var erf = 0;
+      quellen.forEach(function (q) { var o = SOLL[q]; erf += (o.alt + o.fett) / kgC + lastKum(q) * fac; });
       var gel = x.nk - k * fac, offen = erf - gel;
-      h += row("Cuttage erforderlich", nf1.format(erf), "Cuttage", "", "aus " + quellen.map(esc).join(", ") + " samt Drift" + (ew > 0 ? " · Winter separat +" + nf1.format(ew) : ""));
+      h += row("Cuttage erforderlich", nf1.format(erf), "Cuttage", "", "aus " + quellen.map(esc).join(", ") + " samt Drift");
       h += row("Cuttage geleistet", nf1.format(gel), "Cuttage", "", x.nk + (x.nk === 1 ? " Cut Tag" : " Cut Tage") + ", netto, " + bis);
       h += row(offen > 0 ? "Noch offen" : "Kür Tage", nf1.format(Math.abs(offen)), "Cuttage", "calc", offen > 0 ? "bis die Altlast abgebaut ist" : "über die Altlast hinaus");
     } else {
