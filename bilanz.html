@@ -266,7 +266,7 @@ td.s-over, td.s-under { font-weight: 700; }
   <section id="v-monat" aria-label="Monat" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.1.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.2.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -288,7 +288,7 @@ td.s-over, td.s-under { font-weight: 700; }
   var CUTTAG_PER_KCAL = 0.0012; /* 1.000 kcal ca. 1,2 Cuttage */
   var MINUS = "−";
 
-  var Q_DAYS = "select to_char(log_date,'YYYY-MM-DD') as d, phase_name, ruhe::float8 as ruhe, aktiv::float8 as aktiv, workouts::float8 as workouts, alltag::float8 as alltag, workouts_n::int as workouts_n, gegessen::float8 as gegessen, protein_g::float8 as protein_g, carbs_g::float8 as carbs_g, fat_g::float8 as fat_g, verbrauch::float8 as verbrauch, saldo::float8 as saldo, stufe::float8 as stufe, ziel::float8 as ziel from v_tagesbilanz order by log_date";
+  var Q_DAYS = "select to_char(log_date,'YYYY-MM-DD') as d, phase_name, ruhe::float8 as ruhe, aktiv::float8 as aktiv, workouts::float8 as workouts, alltag::float8 as alltag, workouts_n::int as workouts_n, gegessen::float8 as gegessen, protein_g::float8 as protein_g, carbs_g::float8 as carbs_g, fat_g::float8 as fat_g, verbrauch::float8 as verbrauch, saldo::float8 as saldo, stufe::float8 as stufe, ziel::float8 as ziel, gruppe, abw_kum::float8 as abw_kum, tage_kum::int as tage_kum, to_char(gruppe_start,'YYYY-MM-DD') as gruppe_start from v_tagesbilanz order by log_date";
   var Q_BODY = "select to_char(metric_date,'YYYY-MM-DD') as d, weight_kg::float8 as kg, waist_cm::float8 as taille, abdomen_cm::float8 as bauch from v_koerper order by metric_date";
 
   /* ---------- Formatierung ---------- */
@@ -333,7 +333,8 @@ td.s-over, td.s-under { font-weight: 700; }
       var o = {
         d: r.d, phase: r.phase_name, ruhe: num(r.ruhe), aktiv: num(r.aktiv), workouts: num(r.workouts), alltag: num(r.alltag),
         wn: num(r.workouts_n), essen: num(r.gegessen), p: num(r.protein_g), k: num(r.carbs_g), f: num(r.fat_g),
-        verbrauch: num(r.verbrauch), saldo: num(r.saldo), stufe: num(r.stufe), ziel: num(r.ziel)
+        verbrauch: num(r.verbrauch), saldo: num(r.saldo), stufe: num(r.stufe), ziel: num(r.ziel),
+        gruppe: r.gruppe || null, kum: num(r.abw_kum), nk: num(r.tage_kum), gstart: r.gruppe_start || null
       };
       o.abw = (o.essen != null && o.ziel != null) ? o.essen - o.ziel : null;
       return o;
@@ -456,6 +457,17 @@ td.s-over, td.s-under { font-weight: 700; }
     return s + "</svg>";
   }
 
+  function phaseSummary(x) {
+    if (!x.gruppe || x.kum == null) return "";
+    var lastX = null, i, k = x.kum;
+    for (i = days.length - 1; i >= 0; i--) { if (days[i].gruppe === x.gruppe && days[i].kum != null) { lastX = days[i]; break; } }
+    var h = '<div class="sheet">';
+    h += row("Phase gesamt", sgn(k), "kcal", "calc", esc(x.gruppe) + " · seit " + dm(x.gstart) + " · " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel");
+    h += row(Math.abs(k) < 50 ? "Cuttage" : k > 0 ? "Cuttage dazugekommen" : "Cuttage weggefallen", (Math.abs(k) < 50 ? "0,0" : (k < 0 ? "−" : "+") + cut(k)), "Cuttage", "", "bis " + wd(x.d) + " " + dm(x.d));
+    if (lastX && lastX.d !== x.d) h += row("Stand aktuell", sgn(lastX.kum), "kcal", "", "bis " + wd(lastX.d) + " " + dm(lastX.d) + " · ≈ " + cut(lastX.kum) + " Cuttage");
+    return h + "</div>";
+  }
+
   function weekSummary(d) {
     var mon = isoMonday(d), list = [], i, sum = 0, n = 0, essen = 0, ne = 0, over = 0;
     for (i = 0; i < 7; i++) list.push(addDays(mon, i));
@@ -500,6 +512,7 @@ td.s-over, td.s-under { font-weight: 700; }
     if (bd && bd.kg != null) h += row("Gewicht", f1(bd.kg), "kg");
     if (bd && (bd.taille != null || bd.bauch != null)) h += row("Taille · Bauch", (bd.taille != null ? f1(bd.taille) : "–") + " · " + (bd.bauch != null ? f1(bd.bauch) : "–"), "cm");
     h += "</div>";
+    h += phaseSummary(x);
 
     var endD = x.d;
     h += '<div class="sheet"><div class="readout" id="ro-bars" aria-live="polite">' + readoutFor(st.sel) + '</div><div class="chart" id="bars">' + barsSVG(endD) + "</div>";
