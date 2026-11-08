@@ -81,10 +81,32 @@ html.standalone body { padding-top: max(48px, calc(env(safe-area-inset-top) * 1.
 
 main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
+header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 0 4px; }
 header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.015em; }
 .head-right { display: flex; align-items: center; gap: 10px; }
 .ver { color: var(--muted); font-size: 0.72rem; }
+button.ver {
+  font: 500 0.72rem var(--font); color: var(--muted); background: transparent; border: 0; border-radius: 8px;
+  padding: 6px 2px; min-height: 32px; display: inline-flex; align-items: center; gap: 5px;
+}
+button.ver:active { background: color-mix(in srgb, var(--muted) 16%, transparent); }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--muted); }
+.dot.s-ok { background: var(--rest-ink); }
+.dot.s-wait, .dot.s-offline { background: #d98a00; }
+.dot.s-denied { background: var(--danger); }
+@media (prefers-color-scheme: dark) { .dot.s-wait, .dot.s-offline { background: #f0b840; } }
+.sync .label { font-size: 0.92rem; line-height: 1.3; padding: 6px 0; }
+.syncbox { display: grid; gap: 8px; padding: 4px 14px 12px; }
+.syncbox.two { grid-template-columns: 1fr 1fr; }
+.syncbox[hidden], .sync[hidden] { display: none; }
+.syncbox input {
+  width: 100%; height: 42px; padding: 0 12px; font: 600 1rem var(--font); color: var(--ink);
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px;
+}
+.syncbox input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+.syncbox button { min-height: 42px; border-radius: 12px; }
+.syncbox .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
+.syncbox .reset.armed { border-color: var(--danger); color: var(--danger); }
 .navlink {
   font: 700 0.8rem var(--font); color: var(--input-ink); text-decoration: none;
   border: 1.5px solid var(--input-ink); border-radius: 999px; padding: 3px 11px;
@@ -171,8 +193,20 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><span class="ver">v1.3.0</span><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.4.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
+
+  <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
+    <div class="row"><span class="label" id="sync-text">Sync aus</span></div>
+    <div class="syncbox" id="sync-setup">
+      <input id="sync-pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Passwort für den Sync">
+      <button type="button" id="sync-save">Speichern und abgleichen</button>
+    </div>
+    <div class="syncbox two" id="sync-actions" hidden>
+      <button type="button" id="sync-now">Jetzt abgleichen</button>
+      <button type="button" class="reset" id="sync-out">Zugang zurücksetzen</button>
+    </div>
+  </section>
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
     <label class="row input" for="ruhe">
@@ -266,26 +300,38 @@ button:disabled { opacity: 0.4; cursor: default; }
     return out;
   }
 
-  var data = { active: 0, slots: [], clip: null };
-  for (var i = 0; i < SLOT_COUNT; i++) data.slots.push(sanitize(null));
+  /* meta je Slot für den Sync: base = Stand in Neon, den dieses Gerät zuletzt gesehen hat, dirty = lokal geändert und noch nicht gesendet,
+     lt = Zeitpunkt der letzten lokalen Änderung, touched = Slot enthält echte Werte (ein frisches Gerät mit Standardwerten sendet nichts) */
+  var data = { active: 0, slots: [], clip: null, meta: [] };
+  function newMeta(m, touched) {
+    return { base: (m && typeof m.base === "string") ? m.base : null, dirty: !!(m && m.dirty), lt: (m && isFinite(Number(m.lt))) ? Number(m.lt) : 0, rev: 0, touched: m ? !!m.touched : touched };
+  }
+  for (var i = 0; i < SLOT_COUNT; i++) { data.slots.push(sanitize(null)); data.meta.push(newMeta(null, false)); }
 
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var s = JSON.parse(raw);
-        for (var i = 0; i < SLOT_COUNT; i++) data.slots[i] = sanitize(s.slots && s.slots[i]);
+        for (var i = 0; i < SLOT_COUNT; i++) { data.slots[i] = sanitize(s.slots && s.slots[i]); data.meta[i] = newMeta(s.meta && s.meta[i], true); }
         if (s.active === 0 || s.active === 1 || s.active === 2) data.active = s.active;
         data.clip = s.clip ? sanitize(s.clip) : null;
         return;
       }
       /* Übernahme der Werte aus Version 1 in Slot 1 */
       var old = localStorage.getItem(OLD_KEY);
-      if (old) data.slots[0] = sanitize(JSON.parse(old));
+      if (old) { data.slots[0] = sanitize(JSON.parse(old)); data.meta[0] = newMeta(null, true); }
     } catch (e) { /* ohne Speicher weiterarbeiten */ }
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* egal */ }
+  }
+  /* Werte des aktiven Slots wurden hier geändert: lokal sichern, danach im Hintergrund nach Neon senden */
+  function changed(slot) {
+    var m = data.meta[slot === undefined ? data.active : slot];
+    m.dirty = true; m.touched = true; m.lt = Date.now(); m.rev++;
+    save();
+    schedulePush();
   }
 
   function cur() { return data.slots[data.active]; }
@@ -330,25 +376,27 @@ button:disabled { opacity: 0.4; cursor: default; }
     el.addEventListener("input", function () {
       var v = parseFloat(String(el.value).replace(",", "."));
       cur()[el.dataset.key] = isFinite(v) ? v : 0;
-      save();
+      changed();
       update();
     });
     el.addEventListener("focus", function () { try { el.select(); } catch (e) {} });
     el.addEventListener("keydown", function (ev) { if (ev.key === "Enter") el.blur(); });
+    /* Wurde der Slot während der Eingabe aus Neon aktualisiert, werden die Felder erst nach dem Tippen neu geschrieben */
+    el.addEventListener("blur", function () { if (deferApply) { deferApply = false; writeInputs(); update(); } });
   });
 
   document.querySelectorAll("button[data-surplus]").forEach(function (b) {
     b.addEventListener("click", function () {
       cur().surplus = Number(b.dataset.surplus);
       inputs.surplus.value = cur().surplus;
-      save(); update();
+      changed(); update();
     });
   });
   document.querySelectorAll("button[data-step]").forEach(function (b) {
     b.addEventListener("click", function () {
       cur().surplus = cur().surplus + Number(b.dataset.step);
       inputs.surplus.value = cur().surplus;
-      save(); update();
+      changed(); update();
     });
   });
 
@@ -380,7 +428,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   pasteBtn.addEventListener("click", function () {
     if (!data.clip) return;
     data.slots[data.active] = sanitize(data.clip);
-    save(); writeInputs(); update();
+    changed(); writeInputs(); update();
     flash(pasteBtn, "Eingefügt", "Einfügen");
   });
 
@@ -402,13 +450,158 @@ button:disabled { opacity: 0.4; cursor: default; }
     }
     disarm();
     RESET_KEYS.forEach(function (k) { cur()[k] = DEFAULTS[k]; });
-    save(); writeInputs(); update();
+    changed(); writeInputs(); update();
   });
+
+  /* ---------- Sync mit Neon ----------
+     Lokal zuerst: die App rechnet immer mit den Werten auf dem Gerät. Neon läuft im Hintergrund mit.
+     Die Rolle plan_sync sieht nur die Tabelle tagesplanung_sync (3 Zeilen, je Slot). Das Passwort steht nicht im Code,
+     es liegt nur im Speicher dieses Geräts. Konflikte: pro Slot gewinnt der zuletzt geänderte Stand. */
+  var SYNC = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "plan_sync" };
+  var KEY_PW = "tagesplanung-sync-v1";
+  var Q_PULL = "select slot::int as slot, data::text as data, floor(extract(epoch from updated_at)*1000)::bigint::text as v from public.tagesplanung_sync order by slot";
+  var net = { state: "off", at: 0 };
+  var busy = false, again = false, pushTimer = null, retryTimer = null, deferApply = false, lastOk = 0;
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { /* egal */ } }
+  function clock(ts) { var d = new Date(ts); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function pending() { return data.meta.some(function (m) { return m.dirty; }); }
+
+  var dotEl = document.getElementById("sync-dot"), textEl = document.getElementById("sync-text");
+  var panel = document.getElementById("sync-panel"), setupEl = document.getElementById("sync-setup"), actionsEl = document.getElementById("sync-actions");
+  var TEXT = {
+    off: "Sync aus. Passwort eintragen, dann sind PC und iPhone immer auf demselben Stand.",
+    wait: "Gleicht ab …",
+    offline: "Keine Verbindung zu Neon. Änderungen bleiben auf dem Gerät und werden später gesendet.",
+    denied: "Das Passwort wurde abgelehnt. Bitte noch einmal eintragen."
+  };
+  function setNet(state) {
+    net.state = state;
+    dotEl.className = "dot s-" + state;
+    var hasPw = !!lsGet(KEY_PW);
+    textEl.textContent = state === "ok" ? "Synchron · " + clock(net.at) : TEXT[state];
+    setupEl.hidden = hasPw && state !== "denied";
+    actionsEl.hidden = !hasPw;
+  }
+
+  function post(query) {
+    var h = { "Neon-Connection-String": "postgresql://" + SYNC.user + ":" + encodeURIComponent(lsGet(KEY_PW) || "") + "@" + SYNC.host + "/" + SYNC.db + "?sslmode=require", "Neon-Raw-Text-Output": "true" };
+    /* kein Content-Type Header: Safaris Vorab-Prüfung lässt ihn bei Neon nicht durch (wie in der Bilanz) */
+    var opt = { method: "POST", headers: h, body: JSON.stringify({ query: query, params: [] }) }, timer = null;
+    if (typeof AbortController !== "undefined") { var ac = new AbortController(); opt.signal = ac.signal; timer = setTimeout(function () { ac.abort(); }, 15000); }
+    return fetch("https://" + SYNC.host + "/sql", opt).then(function (r) { if (timer) clearTimeout(timer); return r; }, function (e) { if (timer) clearTimeout(timer); throw e; });
+  }
+  /* Die Datenbank schläft nach einigen Minuten und braucht beim Aufwecken ein paar Sekunden: ein zweiter Versuch nach kurzer Pause */
+  function run(query) {
+    return post(query).catch(function () {
+      return new Promise(function (res) { setTimeout(res, 2500); }).then(function () { return post(query); });
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { var e = new Error(t.slice(0, 200)); e.status = r.status; throw e; });
+      return r.json().then(function (j) {
+        var rows = j.rows || [], f = j.fields || [];
+        return rows.map(function (row) {
+          if (!Array.isArray(row)) return row;
+          var o = {}; f.forEach(function (c, i) { o[c.name] = row[i]; }); return o;
+        });
+      });
+    });
+  }
+  function qPush(slot) {
+    var js = JSON.stringify(sanitize(data.slots[slot])).replace(/'/g, "''");
+    return "insert into public.tagesplanung_sync (slot, data, updated_at) values (" + (slot | 0) + ", '" + js + "'::jsonb, now()) on conflict (slot) do update set data = excluded.data, updated_at = now() returning floor(extract(epoch from updated_at)*1000)::bigint::text as v";
+  }
+  function parseVals(d) {
+    try { var o = typeof d === "string" ? JSON.parse(d) : d; if (o && typeof o === "object" && KEYS.some(function (k) { return typeof o[k] === "number" && isFinite(o[k]); })) return sanitize(o); } catch (e) { /* ungültige Zeile zählt als leer */ }
+    return null;
+  }
+
+  function schedulePush() {
+    if (!lsGet(KEY_PW)) return;
+    clearTimeout(pushTimer);
+    setNet("wait");
+    pushTimer = setTimeout(sync, 700);
+  }
+
+  function sync() {
+    clearTimeout(pushTimer); clearTimeout(retryTimer);
+    if (!lsGet(KEY_PW)) { setNet("off"); return Promise.resolve(); }
+    if (busy) { again = true; return Promise.resolve(); }
+    busy = true; setNet("wait");
+    return run(Q_PULL).then(function (rows) {
+      var by = {}, pushes = [], adoptedActive = false;
+      rows.forEach(function (r) { var vals = parseVals(r.data); if (vals) by[Number(r.slot)] = { v: String(r.v), vals: vals }; });
+      for (var s = 0; s < SLOT_COUNT; s++) {
+        var m = data.meta[s], row = by[s];
+        if (!row) { if (m.touched) pushes.push(s); continue; }   /* in Neon noch leer: nur senden, wenn hier echte Werte stehen */
+        if (row.v === m.base) { if (m.dirty) pushes.push(s); continue; }
+        if (m.dirty && m.lt > Number(row.v)) { pushes.push(s); continue; }   /* lokal neuer als Neon */
+        data.slots[s] = row.vals; m.base = row.v; m.dirty = false; m.touched = true; m.lt = Number(row.v);   /* Neon ist neuer: übernehmen */
+        if (s === data.active) adoptedActive = true;
+      }
+      if (adoptedActive || pushes.length === 0) save();
+      if (adoptedActive) {
+        if (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key) deferApply = true;
+        else { writeInputs(); }
+        update();
+      }
+      return pushes.reduce(function (p, s) {
+        return p.then(function () {
+          var m = data.meta[s], rev = m.rev;
+          return run(qPush(s)).then(function (res) {
+            var v = res[0] && res[0].v != null ? String(res[0].v) : null;
+            if (!v) throw new Error("keine Antwort von Neon");
+            m.base = v; m.touched = true; if (m.rev === rev) m.dirty = false;
+          });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      save(); busy = false; net.at = Date.now(); lastOk = net.at;
+      if (again || pending()) { again = false; schedulePush(); } else setNet("ok");
+    }).catch(function (e) {
+      busy = false; again = false;
+      var denied = e && (e.status === 400 || e.status === 401 || e.status === 403) && /password|authentication|role|auth/i.test(e.message || "");
+      if (denied) { setNet("denied"); return; }
+      setNet("offline");
+      retryTimer = setTimeout(function () { if (!document.hidden) sync(); }, 20000);
+    });
+  }
+
+  document.getElementById("sync-toggle").addEventListener("click", function () {
+    panel.hidden = !panel.hidden;
+    this.setAttribute("aria-expanded", String(!panel.hidden));
+    if (!panel.hidden && !lsGet(KEY_PW)) { try { document.getElementById("sync-pw").focus(); } catch (e) {} }
+  });
+  document.getElementById("sync-save").addEventListener("click", function () {
+    var v = document.getElementById("sync-pw").value.trim();
+    if (!v) return;
+    lsSet(KEY_PW, v); document.getElementById("sync-pw").value = ""; sync();
+  });
+  document.getElementById("sync-now").addEventListener("click", function () { sync(); });
+  var outBtn = document.getElementById("sync-out"), outArmed = false, outTimer = null;
+  outBtn.addEventListener("click", function () {
+    if (!outArmed) {
+      outArmed = true; outBtn.textContent = "Sicher?"; outBtn.classList.add("armed");
+      outTimer = setTimeout(function () { outArmed = false; outBtn.textContent = "Zugang zurücksetzen"; outBtn.classList.remove("armed"); }, 3000);
+      return;
+    }
+    clearTimeout(outTimer); outArmed = false; outBtn.textContent = "Zugang zurücksetzen"; outBtn.classList.remove("armed");
+    lsDel(KEY_PW); clearTimeout(pushTimer); clearTimeout(retryTimer); setNet("off");
+  });
+  /* Abgleich beim Zurückkehren in die App, bei wiederkehrendem Netz und alle 60 Sekunden, solange die App offen ist */
+  function soon() { if (lsGet(KEY_PW) && !busy && Date.now() - lastOk > 10000) sync(); }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) soon(); else if (pending()) sync(); });
+  window.addEventListener("online", function () { if (lsGet(KEY_PW)) sync(); });
+  window.addEventListener("pageshow", soon);
+  setInterval(function () { if (!document.hidden && !busy && !pending() && lsGet(KEY_PW)) sync(); }, 60000);
 
   load();
   writeInputs();
   renderSlots();
   update();
+  setNet(lsGet(KEY_PW) ? "wait" : "off");
+  if (lsGet(KEY_PW)) sync();
 })();
 </script>
 </body>
