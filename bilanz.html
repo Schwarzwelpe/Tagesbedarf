@@ -281,7 +281,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.8.2</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.8.3</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -301,7 +301,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", hostPool: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
-  var P = { kgCut: 0.115, kg1000: 0.14, kwBand: 100 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
+  var P = { kgCut: 0.115, kg1000: 0.14, kwBand: 100, evAb: 300 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
   var SOLL = {};                          /* je Gruppe: Plan Fettzuwachs, Altlast, Cut Tage (v_gruppe_soll) */
   var MINUS = "−";
 
@@ -351,7 +351,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var days = [], byDate = {}, body = [], bodyBy = {}, fetchedAt = null;
   var st = { hist: [], tab: "tag", sel: null, month: null, range: 28, hover: null, wsel: null, grp: null };
 
-  function evShow(d) { var x = byDate[d]; return !!(EV[d] && x && x.abw != null && Math.abs(x.abw) > BAND); } /* Ereignis nur bei Abweichung außerhalb des Zielbands */
+  function evShow(d) { var x = byDate[d]; return !!(EV[d] && x && x.abw != null && Math.abs(x.abw) > P.evAb); } /* Ereignis nur bei großer Abweichung, Schwelle in Neon (ereignis_ab_kcal) */
   function num(v) { return v == null || v === "" ? null : Number(v); }
   function setData(rows, brows, stamp, par, soll, ev) {
     days = rows.map(function (r) {
@@ -367,7 +367,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     byDate = {}; days.forEach(function (x) { byDate[x.d] = x; });
     body = brows.map(function (r) { return { d: r.d, kg: num(r.kg), taille: num(r.taille), bauch: num(r.bauch) }; });
     bodyBy = {}; body.forEach(function (x) { bodyBy[x.d] = x; });
-    if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); if (r.key === "kw_band_kcal" && num(r.value) > 0) P.kwBand = num(r.value); });
+    if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); if (r.key === "kw_band_kcal" && num(r.value) > 0) P.kwBand = num(r.value); if (r.key === "ereignis_ab_kcal" && num(r.value) >= 0) P.evAb = num(r.value); });
     if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, cut: num(r.cut_tage) || 0, fuer: r.fuer_cut || null }; }); }
     if (ev) { EV = {}; ev.forEach(function (r) { var k = String(r.d).slice(0, 10); (EV[k] = EV[k] || []).push(r.titel); }); }
     fetchedAt = stamp || Date.now();
