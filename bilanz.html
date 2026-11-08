@@ -212,6 +212,8 @@ svg text { font-family: var(--font); }
 
 .monthnav { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 6px; padding: 8px 8px 0; }
 .monthnav .t { text-align: center; font-size: 1.1rem; font-weight: 800; }
+.monthnav .t small { display: block; margin-top: 2px; font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+.kwhead { padding: 10px 14px 2px; font-weight: 800; }
 .monthnav button { min-height: 44px; font-size: 1.3rem; border-radius: 12px; }
 
 details { border-top: 1px solid var(--line); }
@@ -242,7 +244,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   background: var(--surface); border-top: 1px solid var(--line);
   padding: 8px max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
 }
-.tabs .inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tabs .inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .tabs button { min-height: 44px; border-radius: 12px; font-size: 1rem; border-color: var(--line); color: var(--muted); }
 .tabs button[aria-pressed="true"] { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
 </style>
@@ -266,15 +268,17 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   <section id="v-tag" aria-label="Tag"></section>
   <section id="v-monat" aria-label="Monat" hidden></section>
+  <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.5.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.6.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
   <div class="inner">
     <button type="button" data-tab="tag" aria-pressed="true">Tag</button>
     <button type="button" data-tab="monat" aria-pressed="false">Monat</button>
+    <button type="button" data-tab="phase" aria-pressed="false">Phase</button>
     <button type="button" data-tab="gew" aria-pressed="false">Gewicht</button>
   </div>
 </nav>
@@ -287,7 +291,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", hostPool: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
-  var P = { kgCut: 0.115, kg1000: 0.14 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
+  var P = { kgCut: 0.115, kg1000: 0.14, kwBand: 300 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
   var SOLL = {};                          /* je Gruppe: Plan Fettzuwachs, Altlast, Cut Tage (v_gruppe_soll) */
   var MINUS = "−";
 
@@ -333,7 +337,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   /* ---------- Daten ---------- */
   var days = [], byDate = {}, body = [], bodyBy = {}, fetchedAt = null;
-  var st = { tab: "tag", sel: null, month: null, range: 28, hover: null, wsel: null };
+  var st = { tab: "tag", sel: null, month: null, range: 28, hover: null, wsel: null, grp: null };
 
   function num(v) { return v == null || v === "" ? null : Number(v); }
   function setData(rows, brows, stamp, par, soll) {
@@ -350,7 +354,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     byDate = {}; days.forEach(function (x) { byDate[x.d] = x; });
     body = brows.map(function (r) { return { d: r.d, kg: num(r.kg), taille: num(r.taille), bauch: num(r.bauch) }; });
     bodyBy = {}; body.forEach(function (x) { bodyBy[x.d] = x; });
-    if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); });
+    if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); if (r.key === "kw_band_kcal" && num(r.value) > 0) P.kwBand = num(r.value); });
     if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, cut: num(r.cut_tage) || 0, fuer: r.fuer_cut || null }; }); }
     fetchedAt = stamp || Date.now();
     if (days.length && (!st.sel || !byDate[st.sel])) st.sel = days[days.length - 1].d;
@@ -483,13 +487,10 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     for (var i = days.length - 1; i >= 0; i--) { if (days[i].gruppe === g && days[i].kum != null) return days[i].kum; }
     return 0;
   }
-  function phaseSummary(x) {
-    if (!x.gruppe || x.kum == null) return "";
-    var lastX = null, i, k = x.kum, fac = cf(), kgC = P.kgCut, s = SOLL[x.gruppe], quellen = [], g, bis = "bis " + wd(x.d) + " " + dm(x.d);
-    for (i = days.length - 1; i >= 0; i--) { if (days[i].gruppe === x.gruppe && days[i].kum != null) { lastX = days[i]; break; } }
+  /* Cuttage Zeilen einer Phase, x ist der letzte Tag der Phase */
+  function phaseCut(x) {
+    var k = x.kum, fac = cf(), kgC = P.kgCut, s = SOLL[x.gruppe], quellen = [], g, h = "", bis = "bis " + wd(x.d) + " " + dm(x.d);
     for (g in SOLL) { if (SOLL[g].fuer === x.gruppe) quellen.push(g); }
-    var h = '<div class="sheet">';
-    h += row("Phase gesamt", sgn(k), "kcal", "calc", esc(x.gruppe) + " · seit " + dm(x.gstart) + " · " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel");
     if (s) {
       /* Aufbau: Plan (inklusive Altlast) plus Drift ergibt die Cuttage, die der nächste Cut abarbeiten muss */
       var plan = (s.fett + s.alt) / kgC, drift = k * fac, tot = plan + drift;
@@ -508,8 +509,59 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     } else {
       h += row(Math.abs(k) < 50 ? "Cuttage" : k > 0 ? "Cuttage dazugekommen" : "Cuttage weggefallen", (Math.abs(k) < 50 ? "0,0" : (k < 0 ? "−" : "+") + cut(k)), "Cuttage", "", "netto, über und unter Plan verrechnet, " + bis);
     }
-    if (lastX && lastX.d !== x.d) h += row("Stand aktuell", sgn(lastX.kum), "kcal", "", "bis " + wd(lastX.d) + " " + dm(lastX.d) + " · ≈ " + cut(lastX.kum) + " Cuttage");
-    return h + "</div>";
+    return h;
+  }
+
+  /* Phasen (Gruppen) in zeitlicher Reihenfolge, nur mit Plan Gruppe */
+  function groups() {
+    var o = [], m = {};
+    days.forEach(function (x) {
+      if (!x.gruppe) return;
+      if (!m[x.gruppe]) { m[x.gruppe] = { g: x.gruppe, first: x, last: x, ds: [] }; o.push(m[x.gruppe]); }
+      m[x.gruppe].last = x; m[x.gruppe].ds.push(x);
+    });
+    return o;
+  }
+
+  function renderPhase() {
+    var el = document.getElementById("v-phase");
+    var gs = groups(), i, ci = -1;
+    if (!gs.length) { el.innerHTML = '<div class="info">Noch keine Phase geladen.</div>'; return; }
+    var want = st.grp || (byDate[st.sel] && byDate[st.sel].gruppe);
+    for (i = 0; i < gs.length; i++) { if (gs[i].g === want) ci = i; }
+    if (ci < 0) ci = gs.length - 1;
+    var c = gs[ci], x = c.last, lastDay = days[days.length - 1].d, running = c.last.d === lastDay;
+    var h = '<div class="sheet"><div class="monthnav"><button type="button" data-grp="-1" aria-label="Vorherige Phase"' + (ci <= 0 ? " disabled" : "") + '>‹</button><div class="t">' + esc(c.g) + "<small>" + dm(c.first.d) + " bis " + dm(c.last.d) + c.last.d.slice(0, 4) + (running ? " · läuft" : "") + '</small></div><button type="button" data-grp="1" aria-label="Nächste Phase"' + (ci >= gs.length - 1 ? " disabled" : "") + ">›</button></div>";
+    if (ci < gs.length - 1) h += '<button type="button" class="jump" data-grp="last">Zur aktuellen Phase · ' + esc(gs[gs.length - 1].g) + "</button>";
+    /* Tage nach Plan */
+    var n = 0, ok = 0, over = 0, under = 0;
+    c.ds.forEach(function (d) { if (d.abw == null) return; n++; if (Math.abs(d.abw) <= BAND) ok++; else if (d.abw > 0) over++; else under++; });
+    /* Kalenderwochen */
+    var wk = {}, order = [];
+    c.ds.forEach(function (d) {
+      if (d.abw == null) return;
+      var ws = isoMonday(d.d);
+      if (!wk[ws]) { wk[ws] = { ws: ws, n: 0, sum: 0 }; order.push(ws); }
+      wk[ws].n++; wk[ws].sum += d.abw;
+    });
+    var weeks = order.map(function (w) {
+      var o = wk[w]; o.run = running && o.n < 7 && addDays(w, 6) > lastDay; o.ok = Math.abs(o.sum) <= P.kwBand; return o;
+    });
+    var done = weeks.filter(function (w) { return !w.run; }), wok = done.filter(function (w) { return w.ok; }).length;
+    if (x.kum != null) h += row("Phase gesamt", sgn(x.kum), "kcal", "calc", "gegessen minus Ziel, " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel seit " + dm(x.gstart));
+    if (n) h += row("Tage im Ziel", ok + " von " + n, "Tage", "", over + " drüber, " + under + " drunter (±" + BAND + " kcal)");
+    if (done.length) h += row("Wochen im Ziel", wok + " von " + done.length, "Wochen", "", "Wochensumme innerhalb ±" + P.kwBand + " kcal" + (weeks.length > done.length ? ", laufende Woche nicht gezählt" : ""));
+    if (x.kum != null) h += phaseCut(x);
+    h += "</div>";
+    if (weeks.length) {
+      h += '<div class="sheet"><div class="kwhead">Kalenderwochen</div>';
+      weeks.slice().reverse().forEach(function (w) {
+        var we = addDays(w.ws, 6), cls = w.run ? "" : w.ok ? "s-ok" : w.sum > 0 ? "s-over" : "s-under", sym = w.run ? "…" : w.ok ? "✓" : "✗";
+        h += '<div class="row"><span class="label">KW ' + isoWeek(w.ws) + "<small>" + dm(w.ws) + " bis " + dm(we) + " · " + w.n + " von 7 Tagen" + (w.run ? " · läuft" : "") + '</small></span><span class="value"><span class="num ' + cls + '">' + sym + " " + sgn(w.sum) + '</span><span class="unit">kcal</span></span></div>';
+      });
+      h += '<div class="legend"><span>✓ Wochensumme innerhalb ±' + P.kwBand + " kcal</span><span>✗ außerhalb</span></div></div>";
+    }
+    el.innerHTML = h;
   }
 
   function renderTag() {
@@ -538,7 +590,6 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     if (bd && bd.kg != null) h += row("Gewicht", f1(bd.kg), "kg");
     if (bd && (bd.taille != null || bd.bauch != null)) h += row("Taille · Bauch", (bd.taille != null ? f1(bd.taille) : "–") + " · " + (bd.bauch != null ? f1(bd.bauch) : "–"), "cm");
     h += "</div>";
-    h += phaseSummary(x);
 
     var endD = x.d;
     h += '<div class="sheet"><div class="readout" id="ro-bars" aria-live="polite">' + readoutFor(st.sel) + '</div><div class="chart" id="bars">' + barsSVG(endD) + "</div>";
@@ -578,7 +629,6 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     });
     h += '<div class="sheet">';
     if (n) h += row("Im Ziel", nOk + " von " + n + " Tagen", "", "", "±" + BAND + " kcal um das Ziel");
-    if (n) h += row("Abweichung Summe", sgn(sum), "kcal", "calc", "Kalendermonat, alle Phasen zusammen" + (Math.abs(sum) >= 50 ? " · ≈ " + cut(sum) + " Cuttage " + (sum > 0 ? "über" : "unter") + " Plan" : " · auf Plan"));
     h += '<details><summary>Tabelle anzeigen</summary><table><thead><tr><th>Tag</th><th>Gegessen</th><th>Ziel</th><th>Abw.</th></tr></thead><tbody>';
     md.slice().reverse().forEach(function (x) {
       var s = stateOf(x.abw);
@@ -670,27 +720,34 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   }
 
   /* ---------- Rendern ---------- */
-  var VIEWS = { tag: "v-tag", monat: "v-monat", gew: "v-gew" };
+  var VIEWS = { tag: "v-tag", monat: "v-monat", phase: "v-phase", gew: "v-gew" };
   function render() {
     Object.keys(VIEWS).forEach(function (k) { document.getElementById(VIEWS[k]).hidden = k !== st.tab; });
     document.querySelectorAll("button[data-tab]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.tab === st.tab)); });
     if (!days.length) return;
-    if (st.tab === "tag") renderTag(); else if (st.tab === "monat") renderMonat(); else renderGew();
+    if (st.tab === "tag") renderTag(); else if (st.tab === "monat") renderMonat(); else if (st.tab === "phase") renderPhase(); else renderGew();
   }
   function go(tab) { st.tab = tab; render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } }
 
   /* ---------- Ereignisse ---------- */
   document.addEventListener("click", function (ev) {
-    var t = ev.target.closest ? ev.target.closest("[data-tab],[data-nav],[data-month],[data-range],[data-sel],[data-last]") : null;
+    var t = ev.target.closest ? ev.target.closest("[data-tab],[data-nav],[data-month],[data-range],[data-sel],[data-last],[data-grp]") : null;
     if (!t) return;
+    if (t.dataset.grp) {
+      var gs = groups(), want = st.grp || (byDate[st.sel] && byDate[st.sel].gruppe), gi = -1, q;
+      for (q = 0; q < gs.length; q++) { if (gs[q].g === want) gi = q; }
+      if (gi < 0) gi = gs.length - 1;
+      gi = t.dataset.grp === "last" ? gs.length - 1 : Math.max(0, Math.min(gs.length - 1, gi + Number(t.dataset.grp)));
+      st.grp = gs[gi].g; render(); return;
+    }
     if (t.dataset.last) {
-      if (days.length) { st.sel = days[days.length - 1].d; st.month = st.sel.slice(0, 7); render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } }
+      if (days.length) { st.sel = days[days.length - 1].d; st.month = st.sel.slice(0, 7); st.grp = null; render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } }
       return;
     }
     if (t.dataset.tab) { go(t.dataset.tab); return; }
     if (t.dataset.nav) {
       var i = days.indexOf(byDate[st.sel]) + Number(t.dataset.nav);
-      if (i >= 0 && i < days.length) { st.sel = days[i].d; st.month = st.sel.slice(0, 7); render(); }
+      if (i >= 0 && i < days.length) { st.sel = days[i].d; st.month = st.sel.slice(0, 7); st.grp = null; render(); }
       return;
     }
     if (t.dataset.month) {
@@ -699,7 +756,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     }
     if (t.dataset.range) { st.range = Number(t.dataset.range); st.wsel = null; render(); return; }
     if (t.dataset.sel) {
-      if (byDate[t.dataset.sel]) { st.sel = t.dataset.sel; st.month = st.sel.slice(0, 7); if (t.dataset.goto) st.tab = t.dataset.goto; render(); if (t.dataset.goto) { try { window.scrollTo(0, 0); } catch (e) { /* egal */ } } }
+      if (byDate[t.dataset.sel]) { st.sel = t.dataset.sel; st.month = st.sel.slice(0, 7); st.grp = null; if (t.dataset.goto) st.tab = t.dataset.goto; render(); if (t.dataset.goto) { try { window.scrollTo(0, 0); } catch (e) { /* egal */ } } }
     }
   });
 
