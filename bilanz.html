@@ -281,7 +281,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.8.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.8.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -588,12 +588,12 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     h += '<div class="t"><b>' + wd(x.d) + " " + dm(x.d) + x.d.slice(0, 4) + '</b>' + chip + '</div>';
     h += '<button type="button" data-nav="1" aria-label="Nächster Tag"' + (idx >= days.length - 1 ? " disabled" : "") + ">›</button></div>";
     if (idx < days.length - 1) h += '<button type="button" class="jump" data-last="tag">Zum letzten Tag · ' + wd(days[days.length - 1].d) + " " + dm(days[days.length - 1].d) + "</button>";
-    if (EV[st.sel]) h += '<div class="event">★ ' + EV[st.sel].map(esc).join(" · ") + "</div>";
     if (state) {
       h += '<div class="hero"><div class="big num s-' + state + '">' + sgn(x.abw) + '</div><div class="state s-' + state + '">' + mark(state) + STATE_TXT[state] + '</div><div class="what">Gegessen minus Ziel in kcal' + (Math.abs(x.abw) >= 50 ? " · ≈ " + (x.abw > 0 ? "+" : "−") + cut(x.abw) + " Cuttage" + (x.abw > 0 ? " dazu" : " weniger") : "") + "</div></div>";
     } else {
       h += '<div class="hero"><div class="big num">' + (x.saldo != null ? sgn(x.saldo) : "–") + '</div><div class="state">' + (x.essen == null ? "kein Essen gebucht" : "kein Ziel für diese Phase") + '</div><div class="what">Saldo: gegessen minus Verbrauch in kcal</div></div>';
     }
+    if (EV[st.sel]) h += '<div class="row"><span class="label">' + EV[st.sel].map(esc).join(" · ") + '<small>Ereignis</small></span><span class="value"><span class="num">★</span></span></div>';
     h += row("Ruheenergie", fmt(x.ruhe), "kcal", "", "Apple Watch");
     h += row("Aktivität", fmt(x.aktiv), "kcal", "", "Alltag " + fmt(x.alltag) + " · Workouts " + fmt(x.workouts) + (x.wn ? " (" + x.wn + ")" : ""));
     if (x.stufe != null) h += row("Stufe", sgn(x.stufe), "kcal", "", wd(x.d) === "Sa" || wd(x.d) === "So" ? "Wochenende" : "Mo bis Fr");
@@ -856,13 +856,13 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     if (inflight) return;
     if (!lsGet(KEY_PW) && !window.__BILANZ_MOCK__) { showSetup(""); setStand("kein Zugang", true); return; }
     inflight = true; setStand("lädt …", false);
-    var soft = function (q) { return sql(q).catch(function () { return null; }); }; /* Planwerte sind Beiwerk, fehlen sie, läuft der Rest trotzdem */
+    var evErr = null, soft = function (q) { return sql(q).catch(function (e) { if (q === Q_EREIGNIS) evErr = (e && e.message ? e.message : "Fehler").slice(0, 160); return null; }); }; /* Planwerte sind Beiwerk, fehlen sie, läuft der Rest trotzdem */
     Promise.all([sql(Q_DAYS), sql(Q_BODY), soft(Q_PARAM), soft(Q_SOLL), soft(Q_EREIGNIS)]).then(function (r) {
       inflight = false;
       var now = Date.now();
       lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1], param: r[2], soll: r[3], ev: r[4] }));
       setData(r[0], r[1], now, r[2], r[3], r[4]);
-      infoEl.hidden = true;
+      infoEl.hidden = !evErr; if (evErr) infoEl.textContent = "Ereignisse nicht geladen: " + evErr;
       setStand("Stand " + clock(now), false); render();
     }).catch(function (e) {
       inflight = false;
