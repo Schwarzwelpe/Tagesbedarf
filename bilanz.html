@@ -285,7 +285,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.9.2</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.10.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -315,10 +315,10 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var Q_EREIGNIS = "select datum::text as d, titel from v_ereignis order by datum";
   var CHK = [];                            /* feste Check Termine (v_check) */
   var Q_CHECK = "select datum::text as d, gruppe from v_check order by datum";
-  var T = { fenster: 28, anlauf: 14, luecke: 25, mkg: 0.08, mkcal: 30, kcalkg: 7000, sd: 0.14, senken: 0.30, erhoehen: 0.10, schritt: 50, ampelMin: 21 };
-  var TKEY = { trend_fenster_tage: "fenster", anlauf_tage: "anlauf", watch_luecke_kcal: "luecke", muskel_kg_woche: "mkg", muskel_kcal_tag: "mkcal", kcal_pro_kg: "kcalkg", trend_streuung_kg_woche: "sd", trend_senken_ab: "senken", trend_erhoehen_bis: "erhoehen", stufe_schritt_kcal: "schritt", ampel_min_tage: "ampelMin" };
+  var T = { fenster: 28, anlauf: 14, luecke: 25, mkg: 0.08, mkcal: 30, kcalkg: 7000, sd: 0.14, senken: 0.30, erhoehen: 0.10, schritt: 50, ampelMin: 21, zwSenken: 0.50, zwErhoehen: -0.10, driftKcal: 100, driftTage: 14 };
+  var TKEY = { trend_fenster_tage: "fenster", anlauf_tage: "anlauf", watch_luecke_kcal: "luecke", muskel_kg_woche: "mkg", muskel_kcal_tag: "mkcal", kcal_pro_kg: "kcalkg", trend_streuung_kg_woche: "sd", trend_senken_ab: "senken", trend_erhoehen_bis: "erhoehen", stufe_schritt_kcal: "schritt", ampel_min_tage: "ampelMin", zw_senken_ab: "zwSenken", zw_erhoehen_bis: "zwErhoehen", drift_warn_kcal: "driftKcal", drift_warn_tage: "driftTage" };
   /* Alle Beiwerke in EINER Abfrage: die Lese Rolle hat nur wenige Verbindungen, viele parallele Abfragen scheitern sonst ("too many connections") */
-  var Q_META = "select (select coalesce(json_agg(t), '[]'::json) from (select key, value from v_parameter) t) as par, (select coalesce(json_agg(t), '[]'::json) from (select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll) t) as soll, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, titel from v_ereignis order by datum) t) as ev, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, gruppe from v_check order by datum) t) as chk";
+  var Q_META = "select (select coalesce(json_agg(t), '[]'::json) from (select key, value from v_parameter) t) as par, (select coalesce(json_agg(t), '[]'::json) from (select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll) t) as soll, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, titel from v_ereignis order by datum) t) as ev, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, gruppe, art from v_check order by datum) t) as chk";
   function metaParse(rows) {
     var m = rows && rows[0], o = { par: null, soll: null, ev: null, chk: null };
     if (!m) return o;
@@ -385,8 +385,8 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     bodyBy = {}; body.forEach(function (x) { bodyBy[x.d] = x; });
     if (par) par.forEach(function (r) { if (r.key === "kg_pro_cuttag" && num(r.value) > 0) P.kgCut = num(r.value); if (r.key === "kg_pro_1000kcal" && num(r.value) > 0) P.kg1000 = num(r.value); if (r.key === "kw_band_kcal" && num(r.value) > 0) P.kwBand = num(r.value); if (r.key === "ereignis_ab_kcal" && num(r.value) >= 0) P.evAb = num(r.value); });
     if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, cut: num(r.cut_tage) || 0, fuer: r.fuer_cut || null }; }); }
-    if (par) par.forEach(function (r) { if (TKEY[r.key] && num(r.value) != null && num(r.value) >= 0) T[TKEY[r.key]] = num(r.value); });
-    if (chk) CHK = chk.map(function (r) { return { d: String(r.d).slice(0, 10), g: r.gruppe }; });
+    if (par) par.forEach(function (r) { if (TKEY[r.key] && num(r.value) != null) T[TKEY[r.key]] = num(r.value); });
+    if (chk) CHK = chk.map(function (r) { return { d: String(r.d).slice(0, 10), g: r.gruppe, art: r.art || "regulaer" }; });
     if (ev) { EV = {}; ev.forEach(function (r) { var k = String(r.d).slice(0, 10); (EV[k] = EV[k] || []).push(r.titel); }); }
     fetchedAt = stamp || Date.now();
     if (days.length && (!st.sel || !byDate[st.sel])) st.sel = days[days.length - 1].d;
@@ -571,18 +571,23 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   function f2(v) { return (Math.round(v * 100) / 100).toFixed(2).replace(".", ","); }
   function wk5(d) { var w = pd(d).getDay(); return w >= 1 && w <= 5; }
   /* Regel der Checks, eine einzige Entscheidung: ab senken Stufe runter, bis erhoehen Stufe rauf, dazwischen nichts */
-  function regel(slope) { var v = Math.round(slope * 100) / 100; return v >= T.senken ? "senken" : v <= T.erhoehen ? "erhoehen" : "halten"; }
+  function regel(slope, art) { var v = Math.round(slope * 100) / 100, zw = art === "zwischen"; return v >= (zw ? T.zwSenken : T.senken) ? "senken" : v <= (zw ? T.zwErhoehen : T.erhoehen) ? "erhoehen" : "halten"; }
   function werktagStufe(from, to) {
     for (var i = days.length - 1; i >= 0; i--) { var x = days[i]; if (x.d >= from && x.d <= to && wk5(x.d) && x.stufe != null) return x.stufe; }
     return null;
   }
-  function checkStatus(ch, g) {
+  function checkStatus(ch, g, art) {
     var winEnd = addDays(ch, -1), winStart = addDays(ch, -T.fenster), first = g.first.d;
     var minStart = addDays(first, T.anlauf); if (winStart < minStart) winStart = minStart;
     var tr = trend(winStart, winEnd), s0 = werktagStufe(winStart, winEnd);
-    var o = { d: ch, from: winStart, to: winEnd, tr: tr, s0: s0 };
+    var o = { d: ch, art: art, from: winStart, to: winEnd, tr: tr, s0: s0 };
     if (!tr || s0 == null) { o.state = "daten"; return o; }
-    var rg = regel(tr.slope); o.rg = rg;
+    /* Trend um die Abweichung zum Ziel bereinigt: Was hätte die Stufe allein bewirkt? Zu viel oder zu wenig Essen ist keine Stufenfrage. */
+    var n = 0, sa = 0;
+    g.ds.forEach(function (d) { if (d.d >= winStart && d.d <= winEnd && d.abw != null) { n++; sa += d.abw; } });
+    o.abwM = n ? sa / n : 0; o.adj = tr.slope - o.abwM * 7 / T.kcalkg;
+    var rr = regel(tr.slope, art), rg = regel(o.adj, art);
+    o.rg = rg; o.ursache = rr !== "halten" && rg === "halten" ? rr : null;
     o.s1 = rg === "senken" ? Math.max(0, s0 - T.schritt) : rg === "erhoehen" ? s0 + T.schritt : s0;
     for (var i = 0; i < days.length; i++) { var x = days[i]; if (x.d >= ch && x.gruppe === g.g && wk5(x.d) && x.stufe != null) { o.ist = x.stufe; break; } }
     o.state = o.ist == null ? "faellig" : o.ist === o.s1 ? "erledigt" : "offen";
@@ -596,18 +601,30 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     h += '<div class="sheet"><div class="kwhead">Kurs und Check</div>';
     /* Check Status */
     var past = checks.filter(function (q) { return q.d <= t0; }), next = checks.filter(function (q) { return q.d > t0; })[0];
-    if (past.length) {
-      var ps = checkStatus(past[past.length - 1].d, c), txt, cls;
-      if (ps.state === "daten") { txt = "Daten fehlen"; cls = "s-warn"; }
-      else {
-        var gr = { senken: "Trend zu hoch, Stufe senken", erhoehen: "Trend zu niedrig, Stufe erhöhen", halten: "Trend im Zielbereich, Stufe bleibt" }[ps.rg];
-        txt = ps.state === "erledigt" ? (ps.rg === "halten" ? "✓ Stufe bleibt" : "✓ umgesetzt") : ps.state === "faellig" ? "● Aktion fällig" : "● Aktion offen"; cls = ps.state === "erledigt" ? "s-gruen" : "s-rot";
-        h += row("Check " + dm(ps.d), '<span class="' + cls + '">' + txt + "</span>", "", "", "Trend " + (ps.tr.slope < 0 ? MINUS : "+") + f2(Math.abs(ps.tr.slope)) + " kg/Woche (" + dm(ps.from) + " bis " + dm(ps.to) + "): " + gr);
-        if (ps.state !== "erledigt" && ps.s1 !== ps.s0) h += row("Aktion", "Mo bis Fr " + (ps.s0 >= 0 ? "+" : "") + ps.s0 + " → +" + ps.s1, "kcal", "calc", ps.state === "offen" ? "Regel verlangt +" + ps.s1 + ", in Neon steht +" + ps.ist : "ab Mo " + dm(ps.d) + " in Neon eintragen");
-      }
-    }
-    if (next) h += row("Nächster Check", dm(next.d), "", "", wd(next.d) + ", in " + diffDays(t0, next.d) + (diffDays(t0, next.d) === 1 ? " Tag" : " Tagen") + ", Trend der 28 Tage davor");
+    /* Zeigt den letzten Check und jeden früheren, dessen Aktion noch offen ist */
+    var shown = [];
+    past.forEach(function (q, qi) {
+      var ps = checkStatus(q.d, c, q.art);
+      if (qi === past.length - 1 || ps.state === "faellig" || ps.state === "offen") shown.push(ps);
+    });
+    shown.forEach(function (ps) {
+      var txt, cls, kgs = function (v) { return (v < 0 ? MINUS : "+") + f2(Math.abs(v)); }, zw = ps.art === "zwischen";
+      if (ps.state === "daten") { txt = "Daten fehlen"; cls = "s-warn"; h += row((zw ? "Zwischencheck " : "Check ") + dm(ps.d), '<span class="' + cls + '">' + txt + "</span>", "", "", "zu wenig Wiegungen oder keine Stufe im Fenster"); return; }
+      var gr = ps.ursache
+        ? "Ursache Essen, nicht Stufe: Abweichung Ø " + sgn(ps.abwM) + " kcal/Tag, bereinigt " + kgs(ps.adj) + ", Stufe bleibt, Abweichung abstellen"
+        : { senken: "Trend zu hoch, Stufe senken", erhoehen: "Trend zu niedrig, Stufe erhöhen", halten: "Trend im Zielbereich, Stufe bleibt" }[ps.rg];
+      if (ps.ursache) { txt = "● Ursache Essen"; cls = "s-warn"; }
+      else { txt = ps.state === "erledigt" ? (ps.rg === "halten" ? "✓ Stufe bleibt" : "✓ umgesetzt") : ps.state === "faellig" ? "● Aktion fällig" : "● Aktion offen"; cls = ps.state === "erledigt" ? "s-gruen" : "s-rot"; }
+      h += row((zw ? "Zwischencheck " : "Check ") + dm(ps.d), '<span class="' + cls + '">' + txt + "</span>", "", "", "Trend " + kgs(ps.tr.slope) + " kg/Woche (" + dm(ps.from) + " bis " + dm(ps.to) + "): " + gr);
+      if (ps.state !== "erledigt" && ps.s1 !== ps.s0) h += row("Aktion", "Mo bis Fr " + (ps.s0 >= 0 ? "+" : "") + ps.s0 + " → +" + ps.s1, "kcal", "calc", ps.state === "offen" ? "Regel verlangt +" + ps.s1 + ", in Neon steht +" + ps.ist : "ab Mo " + dm(ps.d) + " in Neon eintragen");
+    });
+    if (next) h += row(next.art === "zwischen" ? "Nächster Zwischencheck" : "Nächster Check", dm(next.d), "", "", wd(next.d) + ", in " + diffDays(t0, next.d) + (diffDays(t0, next.d) === 1 ? " Tag" : " Tagen") + (next.art === "zwischen" ? ", Zwischencheck, nur bei klarem Signal (ab +" + f2(T.zwSenken) + " oder " + MINUS + f2(Math.abs(T.zwErhoehen)) + " und weniger)" : ", Trend der 28 Tage davor"));
     /* Kurs: Waage gegen Kalorien, nur im Aufbau */
+    if (aufbau) {
+      var dn = 0, dsum = 0, dcut = addDays(x.d, -(T.driftTage - 1));
+      c.ds.forEach(function (d) { if (d.d >= dcut && d.abw != null) { dn++; dsum += d.abw; } });
+      if (dn >= 7 && Math.abs(dsum / dn) > T.driftKcal) h += row("Drift Warnung", '<span class="s-rot">● ' + (dsum > 0 ? "über Ziel" : "unter Ziel") + "</span>", "", "", "Abweichung Ø " + sgn(dsum / dn) + " kcal/Tag in den letzten " + dn + " Tagen (Schwelle ±" + T.driftKcal + "), kostet " + (dsum > 0 ? "" : "spart ") + cut(dsum) + " Cuttage");
+    }
     if (aufbau) {
       var end = x.d, start = addDays(c.first.d, T.anlauf), s28 = addDays(end, -(T.fenster - 1)); if (s28 > start) start = s28;
       var len = diffDays(start, end) + 1;
@@ -626,8 +643,9 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
           h += row("Kalorien erwarten", kgw(exp), "kg/Woche", "", "Saldo " + sgn(sm) + " minus Watch Lücke " + T.luecke + ", Muskel " + f2(T.mkg) + " kg/Woche");
           h += row("Differenz", kgw(diff), "kg/Woche", "calc", "≈ " + sgn(diff * T.kcalkg / 7) + " kcal pro Tag, Ampel grün bis ±" + f2(sdE) + ", gelb bis ±" + f2(2 * sdE));
           {
-            var rg = regel(tr.slope), pv = { senken: "Stufe senken", erhoehen: "Stufe erhöhen", halten: "Stufe bleibt" }[rg];
-            if (len < T.fenster) h += row("Check Regel jetzt", pv, "", "", "Vorschau nach " + len + " Tagen, entscheidet nichts, Streuung ±" + f2(sdE) + " kg/Woche");
+            var nart = next ? next.art : "regulaer", adjS = tr.slope - (sa / n) * 7 / T.kcalkg, rr = regel(tr.slope, nart), rg = regel(adjS, nart);
+            var pv = rr !== "halten" && rg === "halten" ? "Ursache Essen, Stufe bleibt" : { senken: "Stufe senken", erhoehen: "Stufe erhöhen", halten: "Stufe bleibt" }[rg];
+            if (len < T.fenster) h += row("Check Regel jetzt", pv, "", "", "Vorschau nach " + len + " Tagen, mit den Schwellen des " + (nart === "zwischen" ? "Zwischenchecks" : "nächsten Checks") + ", um die Abweichung bereinigt, entscheidet nichts, Streuung ±" + f2(sdE) + " kg/Woche");
           }
           h += row("Woher der Überschuss", sgn(sm), "kcal/Tag", "", "Stufe " + sgn(st2 / n) + ", Abweichung " + sgn(sa / n) + ", davon Tage über ±" + P.evAb + ": " + sgn(se / n));
           if (!prelim && amp !== "gruen") {
