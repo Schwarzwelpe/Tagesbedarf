@@ -138,6 +138,7 @@ header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.
 .hero .big { font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
 .hero .state { font-size: 0.92rem; font-weight: 700; margin-top: 2px; display: inline-flex; gap: 6px; align-items: center; }
 .hero .what { color: var(--muted); font-size: 0.75rem; }
+.s-warn, .s-gruen, .s-rot { white-space: nowrap; }
 .s-warn { color: var(--warn); font-weight: 800; } .s-gruen { color: var(--good); font-weight: 800; } .s-rot { color: var(--over); font-weight: 800; }
 .s-over { color: var(--over); } .s-under { color: var(--under); } .s-ok { color: var(--ink); }
 .s-over .mk, .s-under .mk { }
@@ -284,7 +285,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.9.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.9.2</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -611,7 +612,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
       var end = x.d, start = addDays(c.first.d, T.anlauf), s28 = addDays(end, -(T.fenster - 1)); if (s28 > start) start = s28;
       var len = diffDays(start, end) + 1;
       if (len < 14) {
-        h += row("Kurs", '<span class="s-warn">noch zu früh</span>', "", "", len < 1 ? "Anlauf läuft bis " + dm(addDays(c.first.d, T.anlauf - 1)) + ", Trend startet am " + dm(start) : "Trend startet nach dem Anlauf, vorläufig ab " + dm(addDays(start, 13)) + " (14 Tage)");
+        h += row("Kurs", '<span class="s-warn">zu früh</span>', "", "", len < 1 ? "Anlauf läuft bis " + dm(addDays(c.first.d, T.anlauf - 1)) + ", Trend startet am " + dm(start) : "Trend startet nach dem Anlauf, vorläufig ab " + dm(addDays(start, 13)) + " (14 Tage)");
       } else {
         var tr = trend(start, end), n = 0, ss = 0, st2 = 0, sa = 0, se = 0;
         c.ds.forEach(function (d) { if (d.d < start || d.d > end || d.saldo == null || d.abw == null) return; n++; ss += d.saldo; st2 += d.stufe || 0; sa += d.abw; if (Math.abs(d.abw) > P.evAb) se += d.abw; });
