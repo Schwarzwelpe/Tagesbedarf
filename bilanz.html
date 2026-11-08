@@ -284,7 +284,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.9.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.9.1</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -316,6 +316,14 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var Q_CHECK = "select datum::text as d, gruppe from v_check order by datum";
   var T = { fenster: 28, anlauf: 14, luecke: 25, mkg: 0.08, mkcal: 30, kcalkg: 7000, sd: 0.14, senken: 0.30, erhoehen: 0.10, schritt: 50, ampelMin: 21 };
   var TKEY = { trend_fenster_tage: "fenster", anlauf_tage: "anlauf", watch_luecke_kcal: "luecke", muskel_kg_woche: "mkg", muskel_kcal_tag: "mkcal", kcal_pro_kg: "kcalkg", trend_streuung_kg_woche: "sd", trend_senken_ab: "senken", trend_erhoehen_bis: "erhoehen", stufe_schritt_kcal: "schritt", ampel_min_tage: "ampelMin" };
+  /* Alle Beiwerke in EINER Abfrage: die Lese Rolle hat nur wenige Verbindungen, viele parallele Abfragen scheitern sonst ("too many connections") */
+  var Q_META = "select (select coalesce(json_agg(t), '[]'::json) from (select key, value from v_parameter) t) as par, (select coalesce(json_agg(t), '[]'::json) from (select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll) t) as soll, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, titel from v_ereignis order by datum) t) as ev, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, gruppe from v_check order by datum) t) as chk";
+  function metaParse(rows) {
+    var m = rows && rows[0], o = { par: null, soll: null, ev: null, chk: null };
+    if (!m) return o;
+    Object.keys(o).forEach(function (k) { var v = m[k]; try { o[k] = typeof v === "string" ? JSON.parse(v) : v || null; } catch (e) { o[k] = null; } });
+    return o;
+  }
   var Q_SOLL = "select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll";
   var Q_BODY = "select to_char(metric_date,'YYYY-MM-DD') as d, weight_kg::float8 as kg, waist_cm::float8 as taille, abdomen_cm::float8 as bauch from v_koerper order by metric_date";
 
@@ -425,7 +433,8 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     });
   }
   function sql(query) {
-    if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : query === Q_BODY ? "body" : query === Q_PARAM ? "param" : query === Q_EREIGNIS ? "ereignis" : query === Q_CHECK ? "check" : "soll"] || []);
+    if (window.__BILANZ_MOCK__ && query === Q_META) { var mk = window.__BILANZ_MOCK__; return Promise.resolve([{ par: mk.param || [], soll: mk.soll || [], ev: mk.ereignis || [], chk: mk.check || [] }]); }
+    if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : query === Q_BODY ? "body" : query === Q_PARAM ? "param" : query === Q_EREIGNIS ? "ereignis" : query === Q_CHECK ? "check" : query === Q_META ? "meta" : "soll"] || []);
     return request(query).then(function (r) {
       if (!r.ok) {
         return r.text().then(function (t) { var e = new Error(t.slice(0, 200)); e.status = r.status; throw e; });
@@ -581,7 +590,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   function kursBlock(c) {
     var x = c.last, t0 = today(), h = "", i;
     var checks = CHK.filter(function (q) { return q.g === c.g; });
-    var aufbau = x.pt === "lean_gain";
+    var aufbau = x.pt === "lean_gain" || (x.pt == null && /Lean Gain/i.test(c.g));
     if (!aufbau && !checks.length) return "";
     h += '<div class="sheet"><div class="kwhead">Kurs und Check</div>';
     /* Check Status */
@@ -952,13 +961,14 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     if (inflight) return;
     if (!lsGet(KEY_PW) && !window.__BILANZ_MOCK__) { showSetup(""); setStand("kein Zugang", true); return; }
     inflight = true; setStand("lädt …", false);
-    var evErr = null, soft = function (q) { return sql(q).catch(function (e) { if (q === Q_EREIGNIS) evErr = (e && e.message ? e.message : "Fehler").slice(0, 160); return null; }); }; /* Planwerte sind Beiwerk, fehlen sie, läuft der Rest trotzdem */
-    Promise.all([sql(Q_DAYS), sql(Q_BODY), soft(Q_PARAM), soft(Q_SOLL), soft(Q_EREIGNIS), soft(Q_CHECK)]).then(function (r) {
+    var evErr = null, soft = function (q) { return sql(q).catch(function (e) { if (q === Q_META) evErr = (e && e.message ? e.message : "Fehler").slice(0, 160); return null; }); }; /* Planwerte sind Beiwerk, fehlen sie, läuft der Rest trotzdem */
+    Promise.all([sql(Q_DAYS), sql(Q_BODY), soft(Q_META)]).then(function (r) {
+      var m = metaParse(r[2]);
       inflight = false;
       var now = Date.now();
-      lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1], param: r[2], soll: r[3], ev: r[4], chk: r[5] }));
-      setData(r[0], r[1], now, r[2], r[3], r[4], r[5]);
-      infoEl.hidden = !evErr; if (evErr) infoEl.textContent = "Ereignisse nicht geladen: " + evErr;
+      lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1], param: m.par, soll: m.soll, ev: m.ev, chk: m.chk }));
+      setData(r[0], r[1], now, m.par, m.soll, m.ev, m.chk);
+      infoEl.hidden = !evErr; if (evErr) infoEl.textContent = "Zusatzdaten nicht geladen (Parameter, Ereignisse, Checks): " + evErr;
       setStand("Stand " + clock(now), false); render();
     }).catch(function (e) {
       inflight = false;
