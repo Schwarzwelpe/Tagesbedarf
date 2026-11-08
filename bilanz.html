@@ -281,7 +281,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.8.1</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.8.2</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -351,6 +351,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var days = [], byDate = {}, body = [], bodyBy = {}, fetchedAt = null;
   var st = { hist: [], tab: "tag", sel: null, month: null, range: 28, hover: null, wsel: null, grp: null };
 
+  function evShow(d) { var x = byDate[d]; return !!(EV[d] && x && x.abw != null && Math.abs(x.abw) > BAND); } /* Ereignis nur bei Abweichung außerhalb des Zielbands */
   function num(v) { return v == null || v === "" ? null : Number(v); }
   function setData(rows, brows, stamp, par, soll, ev) {
     days = rows.map(function (r) {
@@ -593,7 +594,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     } else {
       h += '<div class="hero"><div class="big num">' + (x.saldo != null ? sgn(x.saldo) : "–") + '</div><div class="state">' + (x.essen == null ? "kein Essen gebucht" : "kein Ziel für diese Phase") + '</div><div class="what">Saldo: gegessen minus Verbrauch in kcal</div></div>';
     }
-    if (EV[st.sel]) h += '<div class="row"><span class="label">' + EV[st.sel].map(esc).join(" · ") + '<small>Ereignis</small></span><span class="value"><span class="num">★</span></span></div>';
+    if (evShow(st.sel)) h += '<div class="row"><span class="label">' + EV[st.sel].map(esc).join(" · ") + '<small>Ereignis</small></span><span class="value"><span class="num">★</span></span></div>';
     h += row("Ruheenergie", fmt(x.ruhe), "kcal", "", "Apple Watch");
     h += row("Aktivität", fmt(x.aktiv), "kcal", "", "Alltag " + fmt(x.alltag) + " · Workouts " + fmt(x.workouts) + (x.wn ? " (" + x.wn + ")" : ""));
     if (x.stufe != null) h += row("Stufe", sgn(x.stufe), "kcal", "", wd(x.d) === "Sa" || wd(x.d) === "So" ? "Wochenende" : "Mo bis Fr");
@@ -637,7 +638,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
       var d = ym + "-" + ("0" + i).slice(-2), x = byDate[d], s = x ? stateOf(x.abw) : null;
       var cls = "c" + (x ? "" : " nodata") + (s === "ok" ? " g-ok" : s ? " g-bad" : "") + (d === st.sel ? " sel" : "") + (d === t ? " today" : "") + (st.kw && isoMonday(d) === st.kw ? " kwon" : "");
       var m2 = x ? (s ? '<span class="n ' + s + '">' + sgn(x.abw) + "</span>" : '<span class="n none">–</span>') : "";
-      h += '<button type="button" class="' + cls + '" data-sel="' + d + '" data-goto="tag"' + (x ? "" : " disabled") + ' aria-label="' + wd(d) + " " + dm(d) + (s ? ", " + STATE_TXT[s] : x ? ", kein Ziel" : ", keine Daten") + '"><span class="d">' + i + (EV[d] ? '<i class="ev">★</i>' : "") + '</span><span class="mkw">' + m2 + "</span></button>";
+      h += '<button type="button" class="' + cls + '" data-sel="' + d + '" data-goto="tag"' + (x ? "" : " disabled") + ' aria-label="' + wd(d) + " " + dm(d) + (s ? ", " + STATE_TXT[s] : x ? ", kein Ziel" : ", keine Daten") + '"><span class="d">' + i + (evShow(d) ? '<i class="ev">★</i>' : "") + '</span><span class="mkw">' + m2 + "</span></button>";
     }
     h += "</div>";
     h += '<div class="legend"><span class="lg-ok">grün: im Ziel (±' + BAND + ')</span><span class="lg-bad">rot: außerhalb</span><span>Zahl = Gegessen minus Ziel in kcal</span></div></div>';
