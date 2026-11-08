@@ -97,16 +97,20 @@ button.ver:active { background: color-mix(in srgb, var(--muted) 16%, transparent
 @media (prefers-color-scheme: dark) { .dot.s-wait, .dot.s-offline { background: #f0b840; } }
 .sync .label { font-size: 0.92rem; line-height: 1.3; padding: 6px 0; }
 .syncbox { display: grid; gap: 8px; padding: 4px 14px 12px; }
-.syncbox.two { grid-template-columns: 1fr 1fr; }
-.syncbox[hidden], .sync[hidden] { display: none; }
+.syncbox[hidden], .synclink[hidden], .sync[hidden] { display: none; }
 .syncbox input {
   width: 100%; height: 42px; padding: 0 12px; font: 600 1rem var(--font); color: var(--ink);
   background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px;
 }
 .syncbox input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
 .syncbox button { min-height: 42px; border-radius: 12px; }
-.syncbox .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
-.syncbox .reset.armed { border-color: var(--danger); color: var(--danger); }
+.synclink { padding: 0 14px 8px; text-align: right; }
+button.linkbtn {
+  font: 500 0.72rem var(--font); color: var(--muted); background: transparent; border: 0; border-radius: 6px;
+  padding: 4px 2px; min-height: 28px; text-decoration: underline;
+}
+button.linkbtn:active { background: transparent; }
+button.linkbtn.armed { color: var(--danger); }
 .navlink {
   font: 700 0.8rem var(--font); color: var(--input-ink); text-decoration: none;
   border: 1.5px solid var(--input-ink); border-radius: 999px; padding: 3px 11px;
@@ -193,7 +197,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.4.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.4.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -202,10 +206,7 @@ button:disabled { opacity: 0.4; cursor: default; }
       <input id="sync-pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Passwort für den Sync">
       <button type="button" id="sync-save">Speichern und abgleichen</button>
     </div>
-    <div class="syncbox two" id="sync-actions" hidden>
-      <button type="button" id="sync-now">Jetzt abgleichen</button>
-      <button type="button" class="reset" id="sync-out">Zugang zurücksetzen</button>
-    </div>
+    <div class="synclink" id="sync-actions" hidden><button type="button" class="linkbtn" id="sync-out">Zugang zurücksetzen</button></div>
   </section>
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
@@ -564,7 +565,7 @@ button:disabled { opacity: 0.4; cursor: default; }
       var denied = e && (e.status === 400 || e.status === 401 || e.status === 403) && /password|authentication|role|auth/i.test(e.message || "");
       if (denied) { setNet("denied"); return; }
       setNet("offline");
-      retryTimer = setTimeout(function () { if (!document.hidden) sync(); }, 20000);
+      retryTimer = setTimeout(function () { if (!document.hidden && active()) sync(); }, 20000);
     });
   }
 
@@ -578,7 +579,6 @@ button:disabled { opacity: 0.4; cursor: default; }
     if (!v) return;
     lsSet(KEY_PW, v); document.getElementById("sync-pw").value = ""; sync();
   });
-  document.getElementById("sync-now").addEventListener("click", function () { sync(); });
   var outBtn = document.getElementById("sync-out"), outArmed = false, outTimer = null;
   outBtn.addEventListener("click", function () {
     if (!outArmed) {
@@ -589,12 +589,22 @@ button:disabled { opacity: 0.4; cursor: default; }
     clearTimeout(outTimer); outArmed = false; outBtn.textContent = "Zugang zurücksetzen"; outBtn.classList.remove("armed");
     lsDel(KEY_PW); clearTimeout(pushTimer); clearTimeout(retryTimer); setNet("off");
   });
-  /* Abgleich beim Zurückkehren in die App, bei wiederkehrendem Netz und alle 60 Sekunden, solange die App offen ist */
+  /* Abgleich beim Zurückkehren in die App, bei wiederkehrendem Netz und alle 15 Sekunden, solange die App sichtbar ist und
+     in den letzten 10 Minuten angetippt wurde. Danach Pause: sonst hielte eine dauerhaft offene Seite die Datenbank wach und
+     würde das Rechenzeit Limit des Free Plans aufbrauchen. Beim nächsten Antippen wird sofort abgeglichen. */
+  var POLL_MS = 15000, IDLE_MS = 10 * 60 * 1000, lastAct = Date.now();
+  function active() { return Date.now() - lastAct < IDLE_MS; }
   function soon() { if (lsGet(KEY_PW) && !busy && Date.now() - lastOk > 10000) sync(); }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) soon(); else if (pending()) sync(); });
+  function touchAct() {
+    var wasIdle = !active();
+    lastAct = Date.now();
+    if (wasIdle) soon();
+  }
+  ["pointerdown", "keydown", "touchstart"].forEach(function (n) { document.addEventListener(n, touchAct, { passive: true, capture: true }); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastAct = Date.now(); soon(); } else if (pending()) sync(); });
   window.addEventListener("online", function () { if (lsGet(KEY_PW)) sync(); });
-  window.addEventListener("pageshow", soon);
-  setInterval(function () { if (!document.hidden && !busy && !pending() && lsGet(KEY_PW)) sync(); }, 60000);
+  window.addEventListener("pageshow", function () { lastAct = Date.now(); soon(); });
+  setInterval(function () { if (!document.hidden && active() && !busy && !pending() && lsGet(KEY_PW)) sync(); }, POLL_MS);
 
   load();
   writeInputs();
