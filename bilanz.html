@@ -180,7 +180,7 @@ svg text { font-family: var(--font); }
 .ln { width: 16px; height: 0; border-top: 2px solid var(--series); display: inline-block; }
 .dt { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
 
-.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 6px 12px 8px; }
+.cal { display: grid; grid-template-columns: 2rem repeat(7, 1fr); gap: 4px; padding: 6px 12px 8px; }
 .cal .wh { text-align: center; font-size: 0.72rem; color: var(--muted); font-weight: 700; padding: 2px 0 4px; }
 .cal button.c {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
@@ -188,6 +188,17 @@ svg text { font-family: var(--font); }
   color: var(--ink); background: var(--bg); font: 600 0.92rem var(--font);
 }
 .cal button.c.out { opacity: 0.35; }
+.cal .kwc { display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--muted); border-radius: 8px; border: 1.5px solid transparent; background: none; padding: 0; min-height: 0; }
+.cal .kwc.kwon, .cal button.c.kwon { border-color: var(--input-ink); }
+.cal .kwc.kwon { color: var(--input-ink); }
+.kwitem { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line, #e3e8ee); border-radius: 0; padding: 0 0 8px; min-height: 0; font: inherit; color: inherit; cursor: pointer; }
+.kwitem .row { border-bottom: 0; }
+.kwitem .dots { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 14px; }
+.kwitem .dots span { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 0; border-radius: 8px; background: transparent; font-size: 0.66rem; color: var(--muted); font-weight: 700; line-height: 1.1; }
+.kwitem .dots span b { font-size: 0.68rem; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.kwitem .dots span.g-ok { background: var(--good-bg); } .kwitem .dots span.g-ok b { color: var(--good); }
+.kwitem .dots span.g-bad { background: var(--bad-bg); } .kwitem .dots span.g-bad b { color: var(--over); }
+.kwitem .go { color: var(--muted); font-weight: 700; margin-left: 4px; }
 .cal button.c.nodata { background: transparent; color: var(--muted); }
 .cal button.c.sel { border-color: var(--total-bg); background: var(--surface); box-shadow: 0 0 0 1.5px var(--total-bg); }
 .cal button.c.today span.d { text-decoration: underline; text-underline-offset: 3px; }
@@ -271,7 +282,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.6.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.7.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -291,7 +302,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", hostPool: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
-  var P = { kgCut: 0.115, kg1000: 0.14, kwBand: 300 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
+  var P = { kgCut: 0.115, kg1000: 0.14, kwBand: 100 }; /* Rückfallwerte, die echten stehen in Neon (v_parameter) */
   var SOLL = {};                          /* je Gruppe: Plan Fettzuwachs, Altlast, Cut Tage (v_gruppe_soll) */
   var MINUS = "−";
 
@@ -550,16 +561,20 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     var done = weeks.filter(function (w) { return !w.run; }), wok = done.filter(function (w) { return w.ok; }).length;
     if (x.kum != null) h += row("Phase gesamt", sgn(x.kum), "kcal", "calc", "gegessen minus Ziel, " + x.nk + (x.nk === 1 ? " Tag" : " Tage") + " mit Ziel seit " + dm(x.gstart));
     if (n) h += row("Tage im Ziel", ok + " von " + n, "Tage", "", over + " drüber, " + under + " drunter (±" + BAND + " kcal)");
-    if (done.length) h += row("Wochen im Ziel", wok + " von " + done.length, "Wochen", "", "Wochensumme innerhalb ±" + P.kwBand + " kcal" + (weeks.length > done.length ? ", laufende Woche nicht gezählt" : ""));
+    if (done.length) h += row("Wochen im Ziel", wok + " von " + done.length + " Wochen", "", "", "Wochensumme innerhalb ±" + P.kwBand + " kcal" + (weeks.length > done.length ? ", laufende Woche nicht gezählt" : ""));
     if (x.kum != null) h += phaseCut(x);
     h += "</div>";
     if (weeks.length) {
       h += '<div class="sheet"><div class="kwhead">Kalenderwochen</div>';
       weeks.slice().reverse().forEach(function (w) {
-        var we = addDays(w.ws, 6), cls = w.run ? "" : w.ok ? "s-ok" : w.sum > 0 ? "s-over" : "s-under", sym = w.run ? "…" : w.ok ? "✓" : "✗";
-        h += '<div class="row"><span class="label">KW ' + isoWeek(w.ws) + "<small>" + dm(w.ws) + " bis " + dm(we) + " · " + w.n + " von 7 Tagen" + (w.run ? " · läuft" : "") + '</small></span><span class="value"><span class="num ' + cls + '">' + sym + " " + sgn(w.sum) + '</span><span class="unit">kcal</span></span></div>';
+        var we = addDays(w.ws, 6), cls = w.run ? "" : w.ok ? "s-ok" : w.sum > 0 ? "s-over" : "s-under", sym = w.run ? "…" : w.ok ? "✓" : "✗", k, dots = "";
+        for (k = 0; k < 7; k++) {
+          var dd = addDays(w.ws, k), dx = byDate[dd], st2 = dx && dx.gruppe === c.g ? stateOf(dx.abw) : null;
+          dots += '<span class="' + (st2 === "ok" ? "g-ok" : st2 ? "g-bad" : "") + '">' + ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][k] + "<b>" + (st2 ? sgn(dx.abw) : "–") + "</b></span>";
+        }
+        h += '<button type="button" class="kwitem" data-kw="' + w.ws + '"><div class="row"><span class="label">KW ' + isoWeek(w.ws) + "<small>" + dm(w.ws) + " bis " + dm(we) + " · " + w.n + " von 7 Tagen" + (w.run ? " · läuft" : "") + '</small></span><span class="value"><span class="num ' + cls + '">' + sym + " " + sgn(w.sum) + '</span><span class="unit">kcal</span><span class="go">›</span></span></div><div class="dots">' + dots + "</div></button>";
       });
-      h += '<div class="legend"><span>✓ Wochensumme innerhalb ±' + P.kwBand + " kcal</span><span>✗ außerhalb</span></div></div>";
+      h += '<div class="legend"><span>✓ Wochensumme innerhalb ±' + P.kwBand + " kcal</span><span>✗ außerhalb</span><span>Tippen öffnet die Woche im Monat</span></div></div>";
     }
     el.innerHTML = h;
   }
@@ -612,11 +627,16 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     var h = '<div class="sheet"><div class="monthnav"><button type="button" data-month="-1" aria-label="Vorheriger Monat"' + (ym <= minM ? " disabled" : "") + '>‹</button><div class="t">' + MONTHS[mo - 1] + " " + y + '</div><button type="button" data-month="1" aria-label="Nächster Monat"' + (ym >= maxM ? " disabled" : "") + ">›</button></div>";
     if (ym !== maxM) h += '<button type="button" class="jump" data-last="monat">Zum aktuellen Monat · ' + MONTHS[+maxM.slice(5, 7) - 1] + "</button>";
     h += '<div class="cal">';
+    h += '<div class="wh">KW</div>';
     ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].forEach(function (w) { h += '<div class="wh">' + w + "</div>"; });
-    for (i = 0; i < lead; i++) h += "<div></div>";
-    for (i = 1; i <= dim; i++) {
+    function kwCell(mon) { return '<button type="button" class="kwc' + (st.kw === mon ? " kwon" : "") + '" data-kwsel="' + mon + '" aria-label="Kalenderwoche ' + isoWeek(mon) + '">' + isoWeek(mon) + "</button>"; }
+    var pos, rows = Math.ceil((lead + dim) / 7);
+    for (pos = 0; pos < rows * 7; pos++) {
+      if (pos % 7 === 0) h += kwCell(addDays(first, pos - lead));
+      i = pos - lead + 1;
+      if (i < 1 || i > dim) { h += "<div></div>"; continue; }
       var d = ym + "-" + ("0" + i).slice(-2), x = byDate[d], s = x ? stateOf(x.abw) : null;
-      var cls = "c" + (x ? "" : " nodata") + (s === "ok" ? " g-ok" : s ? " g-bad" : "") + (d === st.sel ? " sel" : "") + (d === t ? " today" : "");
+      var cls = "c" + (x ? "" : " nodata") + (s === "ok" ? " g-ok" : s ? " g-bad" : "") + (d === st.sel ? " sel" : "") + (d === t ? " today" : "") + (st.kw && isoMonday(d) === st.kw ? " kwon" : "");
       var m2 = x ? (s ? '<span class="n ' + s + '">' + sgn(x.abw) + "</span>" : '<span class="n none">–</span>') : "";
       h += '<button type="button" class="' + cls + '" data-sel="' + d + '" data-goto="tag"' + (x ? "" : " disabled") + ' aria-label="' + wd(d) + " " + dm(d) + (s ? ", " + STATE_TXT[s] : x ? ", kein Ziel" : ", keine Daten") + '"><span class="d">' + i + '</span><span class="mkw">' + m2 + "</span></button>";
     }
@@ -731,8 +751,15 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   /* ---------- Ereignisse ---------- */
   document.addEventListener("click", function (ev) {
-    var t = ev.target.closest ? ev.target.closest("[data-tab],[data-nav],[data-month],[data-range],[data-sel],[data-last],[data-grp]") : null;
+    var t = ev.target.closest ? ev.target.closest("[data-tab],[data-nav],[data-month],[data-range],[data-sel],[data-last],[data-grp],[data-kw],[data-kwsel]") : null;
     if (!t) return;
+    if (t.dataset.kwsel) { st.kw = st.kw === t.dataset.kwsel ? null : t.dataset.kwsel; render(); return; }
+    if (t.dataset.kw) {
+      var kws = t.dataset.kw, km = addDays(kws, 3).slice(0, 7), kmin = days[0].d.slice(0, 7), kmax = days[days.length - 1].d.slice(0, 7);
+      if (km > kmax) km = kws.slice(0, 7);
+      if (km < kmin) km = kmin;
+      st.kw = kws; st.month = km; st.tab = "monat"; render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } return;
+    }
     if (t.dataset.grp) {
       var gs = groups(), want = st.grp || (byDate[st.sel] && byDate[st.sel].gruppe), gi = -1, q;
       for (q = 0; q < gs.length; q++) { if (gs[q].g === want) gi = q; }
@@ -741,22 +768,22 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
       st.grp = gs[gi].g; render(); return;
     }
     if (t.dataset.last) {
-      if (days.length) { st.sel = days[days.length - 1].d; st.month = st.sel.slice(0, 7); st.grp = null; render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } }
+      if (days.length) { st.sel = days[days.length - 1].d; st.month = st.sel.slice(0, 7); st.grp = null; st.kw = null; render(); try { window.scrollTo(0, 0); } catch (e) { /* egal */ } }
       return;
     }
     if (t.dataset.tab) { go(t.dataset.tab); return; }
     if (t.dataset.nav) {
       var i = days.indexOf(byDate[st.sel]) + Number(t.dataset.nav);
-      if (i >= 0 && i < days.length) { st.sel = days[i].d; st.month = st.sel.slice(0, 7); st.grp = null; render(); }
+      if (i >= 0 && i < days.length) { st.sel = days[i].d; st.month = st.sel.slice(0, 7); st.grp = null; st.kw = null; render(); }
       return;
     }
     if (t.dataset.month) {
       var y = +st.month.slice(0, 4), m = +st.month.slice(5, 7) - 1 + Number(t.dataset.month), nd = new Date(y, m, 1, 12);
-      st.month = nd.getFullYear() + "-" + ("0" + (nd.getMonth() + 1)).slice(-2); render(); return;
+      st.month = nd.getFullYear() + "-" + ("0" + (nd.getMonth() + 1)).slice(-2); st.kw = null; render(); return;
     }
     if (t.dataset.range) { st.range = Number(t.dataset.range); st.wsel = null; render(); return; }
     if (t.dataset.sel) {
-      if (byDate[t.dataset.sel]) { st.sel = t.dataset.sel; st.month = st.sel.slice(0, 7); st.grp = null; if (t.dataset.goto) st.tab = t.dataset.goto; render(); if (t.dataset.goto) { try { window.scrollTo(0, 0); } catch (e) { /* egal */ } } }
+      if (byDate[t.dataset.sel]) { st.sel = t.dataset.sel; st.month = st.sel.slice(0, 7); st.grp = null; st.kw = null; if (t.dataset.goto) st.tab = t.dataset.goto; render(); if (t.dataset.goto) { try { window.scrollTo(0, 0); } catch (e) { /* egal */ } } }
     }
   });
 
