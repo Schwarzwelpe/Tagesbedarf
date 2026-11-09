@@ -201,7 +201,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.5.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.5.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -298,7 +298,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
-  var DAY_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  var DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];   /* kurz, damit die Kopfzeile bei keinem Wochentag umbricht */
   function todayIdx() { return (new Date().getDay() + 6) % 7; }
   function dayNum(ts) { var d = new Date(ts); return d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate(); }
   var nf = new Intl.NumberFormat("de-DE");
@@ -402,7 +402,7 @@ button:disabled { opacity: 0.4; cursor: default; }
       b.setAttribute("aria-pressed", String(Number(b.dataset.slot) === data.active));
       b.classList.toggle("today", Number(b.dataset.slot) === todayIdx());
     });
-    document.getElementById("slot-pill").textContent = DAY_LONG[data.active] + (data.active === todayIdx() ? " · heute" : "");
+    document.getElementById("slot-pill").textContent = DAY_SHORT[data.active];
     document.getElementById("paste").disabled = !data.clip;
   }
 
