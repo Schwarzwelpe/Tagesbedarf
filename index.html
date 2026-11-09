@@ -201,7 +201,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.5.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.5.2<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -294,7 +294,8 @@ button:disabled { opacity: 0.4; cursor: default; }
 (function () {
   var STORE_KEY = "tagesplanung-v2";
   var OLD_KEY = "tagesbedarf-v1";
-  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 0, surplus: 150, essen: 0 };
+  /* Standard (auch nach Reset): Ruhe 2050, Alltag 300 (Rod: darunter kommt er praktisch nie, schlechtester Fall) */
+  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 300, surplus: 150, essen: 0 };
   var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
@@ -327,7 +328,8 @@ button:disabled { opacity: 0.4; cursor: default; }
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var s = JSON.parse(raw);
-        for (var i = 0; i < SLOT_COUNT; i++) { data.slots[i] = sanitize(s.slots && s.slots[i], i); data.meta[i] = newMeta(s.meta && s.meta[i], !!(s.slots && s.slots[i])); }
+        for (var i = 0; i < SLOT_COUNT; i++) { data.slots[i] = sanitize(s.slots && s.slots[i], i); data.meta[i] = newMeta(s.meta && s.meta[i], !!(s.slots && s.slots[i]));
+          if (!data.meta[i].touched) data.slots[i] = sanitize(null, i);   /* nie bearbeitet: immer die aktuellen Standardwerte */ }
         data.clip = s.clip ? sanitize(s.clip) : null;
         return;
       }
