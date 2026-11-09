@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tagesplanung</title>
-<meta name="description" content="Tagesplanung: Ruheenergie plus Aktivität plus Surplus, abzüglich geplantem Essen, in drei Slots.">
+<meta name="description" content="Tagesplanung: Ruheenergie plus Aktivität plus Surplus, abzüglich geplantem Essen, pro Wochentag (Mo bis So).">
 <meta name="theme-color" content="#f1f5fa" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e181e" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,7 +18,7 @@
 <script>if (window.navigator.standalone) document.documentElement.classList.add("standalone");</script>
 <style>
 :root {
-  /* Layout: eine Spalte, alle Zeilen kompakt, Slot Umschalter als feste Leiste unten */
+  /* Layout: eine Spalte, alle Zeilen kompakt, Wochentag Umschalter (Mo bis So) als feste Leiste unten */
   --bg: #f1f5fa;
   --surface: #ffffff;
   --ink: #1b2a33;
@@ -185,10 +185,14 @@ button:disabled { opacity: 0.4; cursor: default; }
   background: var(--surface); border-top: 1px solid var(--line);
   padding: 8px max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
 }
-.slots .inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.slots .inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .slots button {
-  min-height: 44px; border-radius: 12px; font-size: 1rem;
+  min-height: 44px; border-radius: 12px; font-size: 0.92rem; padding: 0; position: relative;
   border-color: var(--line); color: var(--muted); background: transparent;
+}
+.slots button.today::after {
+  content: ""; position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%; background: currentColor;
 }
 .slots button[aria-pressed="true"] { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
 </style>
@@ -197,7 +201,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.4.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.5.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -274,11 +278,15 @@ button:disabled { opacity: 0.4; cursor: default; }
   </div>
 </main>
 
-<nav class="slots" aria-label="Slot wählen">
+<nav class="slots" aria-label="Wochentag wählen">
   <div class="inner">
-    <button type="button" data-slot="0" aria-pressed="true">Slot 1</button>
-    <button type="button" data-slot="1" aria-pressed="false">Slot 2</button>
-    <button type="button" data-slot="2" aria-pressed="false">Slot 3</button>
+    <button type="button" data-slot="0" aria-pressed="false">Mo</button>
+    <button type="button" data-slot="1" aria-pressed="false">Di</button>
+    <button type="button" data-slot="2" aria-pressed="false">Mi</button>
+    <button type="button" data-slot="3" aria-pressed="false">Do</button>
+    <button type="button" data-slot="4" aria-pressed="false">Fr</button>
+    <button type="button" data-slot="5" aria-pressed="false">Sa</button>
+    <button type="button" data-slot="6" aria-pressed="false">So</button>
   </div>
 </nav>
 
@@ -289,14 +297,19 @@ button:disabled { opacity: 0.4; cursor: default; }
   var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 0, surplus: 150, essen: 0 };
   var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
   var KEYS = Object.keys(DEFAULTS);
-  var SLOT_COUNT = 3;
+  var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
+  var DAY_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  function todayIdx() { return (new Date().getDay() + 6) % 7; }
+  function dayNum(ts) { var d = new Date(ts); return d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate(); }
   var nf = new Intl.NumberFormat("de-DE");
   var inputs = {};
 
-  function sanitize(obj) {
+  /* Stufe Standard: Mo bis Fr +150, Sa und So 0 (Lean Gain Phase 3); ändert sich die Stufe, hier und in den Stufen Buttons anpassen */
+  function sanitize(obj, slot) {
     var out = {};
     KEYS.forEach(function (k) {
-      out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : DEFAULTS[k];
+      var def = (k === "surplus" && slot >= 5) ? 0 : DEFAULTS[k];
+      out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : def;
     });
     return out;
   }
@@ -307,22 +320,41 @@ button:disabled { opacity: 0.4; cursor: default; }
   function newMeta(m, touched) {
     return { base: (m && typeof m.base === "string") ? m.base : null, dirty: !!(m && m.dirty), lt: (m && isFinite(Number(m.lt))) ? Number(m.lt) : 0, rev: 0, touched: m ? !!m.touched : touched };
   }
-  for (var i = 0; i < SLOT_COUNT; i++) { data.slots.push(sanitize(null)); data.meta.push(newMeta(null, false)); }
+  for (var i = 0; i < SLOT_COUNT; i++) { data.slots.push(sanitize(null, i)); data.meta.push(newMeta(null, false)); }
 
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var s = JSON.parse(raw);
-        for (var i = 0; i < SLOT_COUNT; i++) { data.slots[i] = sanitize(s.slots && s.slots[i]); data.meta[i] = newMeta(s.meta && s.meta[i], true); }
-        if (s.active === 0 || s.active === 1 || s.active === 2) data.active = s.active;
+        for (var i = 0; i < SLOT_COUNT; i++) { data.slots[i] = sanitize(s.slots && s.slots[i], i); data.meta[i] = newMeta(s.meta && s.meta[i], !!(s.slots && s.slots[i])); }
         data.clip = s.clip ? sanitize(s.clip) : null;
         return;
       }
       /* Übernahme der Werte aus Version 1 in Slot 1 */
       var old = localStorage.getItem(OLD_KEY);
-      if (old) { data.slots[0] = sanitize(JSON.parse(old)); data.meta[0] = newMeta(null, true); }
+      if (old) { data.slots[0] = sanitize(JSON.parse(old), 0); data.meta[0] = newMeta(null, true); }
     } catch (e) { /* ohne Speicher weiterarbeiten */ }
+  }
+  /* Wochentage: Jeder Slot gehört zum nächsten Auftreten seines Wochentags ab dem Tag der letzten Änderung (Plan am Sonntag für Montag
+     gilt für den kommenden Montag). Liegt dieser Tag in der Vergangenheit, ist der Plan abgelaufen: Training, Alltag und Essen
+     springen auf 0 wie beim Reset (Ruhe und Stufe bleiben). Das passiert nur in der Anzeige und ändert nichts an Neon; jedes Gerät
+     rechnet es aus dem Zeitstempel der letzten Änderung selbst aus. */
+  function isStale(i) {
+    var lt = data.meta[i].lt;
+    if (!lt) return false;
+    var e = new Date(lt), add = (i - ((e.getDay() + 6) % 7) + 7) % 7;
+    var target = new Date(e.getFullYear(), e.getMonth(), e.getDate() + add).getTime();
+    return dayNum(target) < dayNum(Date.now());
+  }
+  function expire() {
+    var changedActive = false;
+    for (var i = 0; i < SLOT_COUNT; i++) {
+      if (!isStale(i)) continue;
+      var sl = data.slots[i];
+      RESET_KEYS.forEach(function (k) { if (sl[k] !== DEFAULTS[k]) { sl[k] = DEFAULTS[k]; if (i === data.active) changedActive = true; } });
+    }
+    return changedActive;
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* egal */ }
@@ -336,6 +368,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   }
 
   function cur() { return data.slots[data.active]; }
+  var loadDay = dayNum(Date.now());
 
   function calc(s) {
     var aktivitaet = s.t1 + s.t2 + s.t3 + s.alltag;
@@ -367,8 +400,9 @@ button:disabled { opacity: 0.4; cursor: default; }
   function renderSlots() {
     document.querySelectorAll("button[data-slot]").forEach(function (b) {
       b.setAttribute("aria-pressed", String(Number(b.dataset.slot) === data.active));
+      b.classList.toggle("today", Number(b.dataset.slot) === todayIdx());
     });
-    document.getElementById("slot-pill").textContent = "Slot " + (data.active + 1);
+    document.getElementById("slot-pill").textContent = DAY_LONG[data.active] + (data.active === todayIdx() ? " · heute" : "");
     document.getElementById("paste").disabled = !data.clip;
   }
 
@@ -409,6 +443,7 @@ button:disabled { opacity: 0.4; cursor: default; }
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       disarm();
       data.active = n;
+      expire();
       save(); writeInputs(); renderSlots(); update();
     });
   });
@@ -456,8 +491,8 @@ button:disabled { opacity: 0.4; cursor: default; }
 
   /* ---------- Sync mit Neon ----------
      Lokal zuerst: die App rechnet immer mit den Werten auf dem Gerät. Neon läuft im Hintergrund mit.
-     Die Rolle plan_sync sieht nur die Tabelle tagesplanung_sync (3 Zeilen, je Slot). Das Passwort steht nicht im Code,
-     es liegt nur im Speicher dieses Geräts. Konflikte: pro Slot gewinnt der zuletzt geänderte Stand. */
+     Die Rolle plan_sync sieht nur die Tabelle tagesplanung_sync (7 Zeilen, je Wochentag). Das Passwort steht nicht im Code,
+     es liegt nur im Speicher dieses Geräts. Konflikte: pro Wochentag gewinnt der zuletzt geänderte Stand. */
   var SYNC = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "plan_sync" };
   var KEY_PW = "tagesplanung-sync-v1";
   var Q_PULL = "select slot::int as slot, data::text as data, floor(extract(epoch from updated_at)*1000)::bigint::text as v from public.tagesplanung_sync order by slot";
@@ -510,11 +545,11 @@ button:disabled { opacity: 0.4; cursor: default; }
     });
   }
   function qPush(slot) {
-    var js = JSON.stringify(sanitize(data.slots[slot])).replace(/'/g, "''");
+    var js = JSON.stringify(sanitize(data.slots[slot], slot)).replace(/'/g, "''");
     return "insert into public.tagesplanung_sync (slot, data, updated_at) values (" + (slot | 0) + ", '" + js + "'::jsonb, now()) on conflict (slot) do update set data = excluded.data, updated_at = now() returning floor(extract(epoch from updated_at)*1000)::bigint::text as v";
   }
-  function parseVals(d) {
-    try { var o = typeof d === "string" ? JSON.parse(d) : d; if (o && typeof o === "object" && KEYS.some(function (k) { return typeof o[k] === "number" && isFinite(o[k]); })) return sanitize(o); } catch (e) { /* ungültige Zeile zählt als leer */ }
+  function parseVals(d, slot) {
+    try { var o = typeof d === "string" ? JSON.parse(d) : d; if (o && typeof o === "object" && KEYS.some(function (k) { return typeof o[k] === "number" && isFinite(o[k]); })) return sanitize(o, slot); } catch (e) { /* ungültige Zeile zählt als leer */ }
     return null;
   }
 
@@ -532,7 +567,7 @@ button:disabled { opacity: 0.4; cursor: default; }
     busy = true; setNet("wait");
     return run(Q_PULL).then(function (rows) {
       var by = {}, pushes = [], adoptedActive = false;
-      rows.forEach(function (r) { var vals = parseVals(r.data); if (vals) by[Number(r.slot)] = { v: String(r.v), vals: vals }; });
+      rows.forEach(function (r) { var n = Number(r.slot), vals = (n >= 0 && n < SLOT_COUNT) ? parseVals(r.data, n) : null; if (vals) by[n] = { v: String(r.v), vals: vals }; });
       for (var s = 0; s < SLOT_COUNT; s++) {
         var m = data.meta[s], row = by[s];
         if (!row) { if (m.touched) pushes.push(s); continue; }   /* in Neon noch leer: nur senden, wenn hier echte Werte stehen */
@@ -541,6 +576,7 @@ button:disabled { opacity: 0.4; cursor: default; }
         data.slots[s] = row.vals; m.base = row.v; m.dirty = false; m.touched = true; m.lt = Number(row.v);   /* Neon ist neuer: übernehmen */
         if (s === data.active) adoptedActive = true;
       }
+      if (expire()) adoptedActive = true;
       if (adoptedActive || pushes.length === 0) save();
       if (adoptedActive) {
         if (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key) deferApply = true;
@@ -601,12 +637,20 @@ button:disabled { opacity: 0.4; cursor: default; }
     if (wasIdle) soon();
   }
   ["pointerdown", "keydown", "touchstart"].forEach(function (n) { document.addEventListener(n, touchAct, { passive: true, capture: true }); });
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) { lastAct = Date.now(); soon(); } else if (pending()) sync(); });
+  function newDay() {
+    if (dayNum(Date.now()) === loadDay) return;
+    loadDay = dayNum(Date.now());
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    data.active = todayIdx(); expire(); save(); writeInputs(); renderSlots(); update();
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { newDay(); lastAct = Date.now(); soon(); } else if (pending()) sync(); });
   window.addEventListener("online", function () { if (lsGet(KEY_PW)) sync(); });
-  window.addEventListener("pageshow", function () { lastAct = Date.now(); soon(); });
+  window.addEventListener("pageshow", function () { newDay(); lastAct = Date.now(); soon(); });
   setInterval(function () { if (!document.hidden && active() && !busy && !pending() && lsGet(KEY_PW)) sync(); }, POLL_MS);
 
   load();
+  data.active = todayIdx();
+  expire();
   writeInputs();
   renderSlots();
   update();
