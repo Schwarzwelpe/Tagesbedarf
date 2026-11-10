@@ -125,6 +125,9 @@ header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.
 .row .value { display: flex; align-items: baseline; gap: 6px; font-weight: 700; font-size: 1.1rem; text-align: right; }
 .row.calc { background: var(--calc-row); }
 .row.calc .value { font-weight: 800; font-size: 1.25rem; }
+.row.sum { border-top: 2px solid var(--axis); }
+.row.sum .label { font-weight: 700; }
+.row.sum .value { font-weight: 800; }
 .unit { color: var(--muted); font-size: 0.75rem; font-weight: 600; }
 
 .daynav { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 6px; padding: 8px 8px 0; }
@@ -285,7 +288,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.10.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.11.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -301,7 +304,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 (function () {
   "use strict";
 
-  /* Der Lesezugang sieht nur die Ansichten v_tagesbilanz und v_koerper. Das Passwort steht nicht im Code. */
+  /* Der Lesezugang sieht nur Ansichten (v_tagesbilanz, v_koerper, v_parameter, v_gruppe_soll, v_ereignis, v_check, v_tag_workouts). Das Passwort steht nicht im Code. */
   var CFG = { host: "ep-icy-bird-b1nu0xgj.c-5.eu-central-1.aws.neon.tech", hostPool: "ep-icy-bird-b1nu0xgj-pooler.c-5.eu-central-1.aws.neon.tech", db: "neondb", user: "bilanz_lesen" };
   var KEY_PW = "bilanz-zugang-v1", KEY_CACHE = "bilanz-cache-v1";
   var BAND = 100;               /* Zielband in kcal */
@@ -311,6 +314,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   var Q_DAYS = "select to_char(log_date,'YYYY-MM-DD') as d, phase_name, phase_type, ruhe::float8 as ruhe, aktiv::float8 as aktiv, workouts::float8 as workouts, alltag::float8 as alltag, workouts_n::int as workouts_n, gegessen::float8 as gegessen, protein_g::float8 as protein_g, carbs_g::float8 as carbs_g, fat_g::float8 as fat_g, verbrauch::float8 as verbrauch, saldo::float8 as saldo, stufe::float8 as stufe, ziel::float8 as ziel, gruppe, abw_kum::float8 as abw_kum, tage_kum::int as tage_kum, to_char(gruppe_start,'YYYY-MM-DD') as gruppe_start from v_tagesbilanz order by log_date";
   var Q_PARAM = "select key, value from v_parameter";
+  var WK = {};                            /* Trainings je Datum und Art (v_tag_workouts) */
   var EV = {};                            /* Ereignisse je Datum (v_ereignis) */
   var Q_EREIGNIS = "select datum::text as d, titel from v_ereignis order by datum";
   var CHK = [];                            /* feste Check Termine (v_check) */
@@ -318,9 +322,9 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var T = { fenster: 28, anlauf: 14, luecke: 25, mkg: 0.08, mkcal: 30, kcalkg: 7000, sd: 0.14, senken: 0.30, erhoehen: 0.10, schritt: 50, ampelMin: 21, zwSenken: 0.50, zwErhoehen: -0.10, driftKcal: 100, driftTage: 14 };
   var TKEY = { trend_fenster_tage: "fenster", anlauf_tage: "anlauf", watch_luecke_kcal: "luecke", muskel_kg_woche: "mkg", muskel_kcal_tag: "mkcal", kcal_pro_kg: "kcalkg", trend_streuung_kg_woche: "sd", trend_senken_ab: "senken", trend_erhoehen_bis: "erhoehen", stufe_schritt_kcal: "schritt", ampel_min_tage: "ampelMin", zw_senken_ab: "zwSenken", zw_erhoehen_bis: "zwErhoehen", drift_warn_kcal: "driftKcal", drift_warn_tage: "driftTage" };
   /* Alle Beiwerke in EINER Abfrage: die Lese Rolle hat nur wenige Verbindungen, viele parallele Abfragen scheitern sonst ("too many connections") */
-  var Q_META = "select (select coalesce(json_agg(t), '[]'::json) from (select key, value from v_parameter) t) as par, (select coalesce(json_agg(t), '[]'::json) from (select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll) t) as soll, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, titel from v_ereignis order by datum) t) as ev, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, gruppe, art from v_check order by datum) t) as chk";
+  var Q_META = "select (select coalesce(json_agg(t), '[]'::json) from (select key, value from v_parameter) t) as par, (select coalesce(json_agg(t), '[]'::json) from (select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll) t) as soll, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, titel from v_ereignis order by datum) t) as ev, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, gruppe, art from v_check order by datum) t) as chk, (select coalesce(json_agg(t), '[]'::json) from (select log_date::text as d, typ, n::int as n, minuten::float8 as minuten, kcal::float8 as kcal from v_tag_workouts order by log_date, kcal desc) t) as wk";
   function metaParse(rows) {
-    var m = rows && rows[0], o = { par: null, soll: null, ev: null, chk: null };
+    var m = rows && rows[0], o = { par: null, soll: null, ev: null, chk: null, wk: null };
     if (!m) return o;
     Object.keys(o).forEach(function (k) { var v = m[k]; try { o[k] = typeof v === "string" ? JSON.parse(v) : v || null; } catch (e) { o[k] = null; } });
     return o;
@@ -369,7 +373,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   function evShow(d) { var x = byDate[d]; return !!(EV[d] && x && x.abw != null && Math.abs(x.abw) > P.evAb); } /* Ereignis nur bei großer Abweichung, Schwelle in Neon (ereignis_ab_kcal) */
   function num(v) { return v == null || v === "" ? null : Number(v); }
-  function setData(rows, brows, stamp, par, soll, ev, chk) {
+  function setData(rows, brows, stamp, par, soll, ev, chk, wk) {
     days = rows.map(function (r) {
       var o = {
         d: r.d, phase: r.phase_name, pt: r.phase_type || null, ruhe: num(r.ruhe), aktiv: num(r.aktiv), workouts: num(r.workouts), alltag: num(r.alltag),
@@ -387,6 +391,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     if (soll) { SOLL = {}; soll.forEach(function (r) { SOLL[r.gruppe] = { fett: num(r.soll_fett_kg) || 0, alt: num(r.altlast_kg) || 0, cut: num(r.cut_tage) || 0, fuer: r.fuer_cut || null }; }); }
     if (par) par.forEach(function (r) { if (TKEY[r.key] && num(r.value) != null) T[TKEY[r.key]] = num(r.value); });
     if (chk) CHK = chk.map(function (r) { return { d: String(r.d).slice(0, 10), g: r.gruppe, art: r.art || "regulaer" }; });
+    if (wk) { WK = {}; wk.forEach(function (r) { var k = String(r.d).slice(0, 10); (WK[k] = WK[k] || []).push({ typ: r.typ, n: num(r.n) || 1, min: num(r.minuten) || 0, kcal: num(r.kcal) || 0 }); }); }
     if (ev) { EV = {}; ev.forEach(function (r) { var k = String(r.d).slice(0, 10); (EV[k] = EV[k] || []).push(r.titel); }); }
     fetchedAt = stamp || Date.now();
     if (days.length && (!st.sel || !byDate[st.sel])) st.sel = days[days.length - 1].d;
@@ -434,7 +439,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     });
   }
   function sql(query) {
-    if (window.__BILANZ_MOCK__ && query === Q_META) { var mk = window.__BILANZ_MOCK__; return Promise.resolve([{ par: mk.param || [], soll: mk.soll || [], ev: mk.ereignis || [], chk: mk.check || [] }]); }
+    if (window.__BILANZ_MOCK__ && query === Q_META) { var mk = window.__BILANZ_MOCK__; return Promise.resolve([{ par: mk.param || [], soll: mk.soll || [], ev: mk.ereignis || [], chk: mk.check || [], wk: mk.wk || [] }]); }
     if (window.__BILANZ_MOCK__) return Promise.resolve(window.__BILANZ_MOCK__[query === Q_DAYS ? "days" : query === Q_BODY ? "body" : query === Q_PARAM ? "param" : query === Q_EREIGNIS ? "ereignis" : query === Q_CHECK ? "check" : query === Q_META ? "meta" : "soll"] || []);
     return request(query).then(function (r) {
       if (!r.ok) {
@@ -458,6 +463,9 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
 
   /* ---------- Tag ---------- */
   function monthDays(ym) { return days.filter(function (x) { return x.d.slice(0, 7) === ym; }); }
+
+  var WK_PL = { Spaziergang: "Spaziergänge", Radfahren: "Radfahrten", Laufen: "Läufe" };
+  function wkLabel(w) { var t = w.n > 1 && WK_PL[w.typ] ? WK_PL[w.typ] : w.typ; return esc(t) + (w.n > 1 ? " (" + w.n + ")" : ""); }
 
   function row(label, value, unit, cls, small) {
     return '<div class="row ' + (cls || "") + '"><span class="label">' + label + (small ? "<small>" + small + "</small>" : "") + '</span><span class="value"><span class="num">' + value + '</span>' + (unit ? '<span class="unit">' + unit + "</span>" : "") + "</span></div>";
@@ -718,10 +726,22 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
       h += '<div class="hero"><div class="big num">' + (x.saldo != null ? sgn(x.saldo) : "–") + '</div><div class="state">' + (x.essen == null ? "kein Essen gebucht" : "kein Ziel für diese Phase") + '</div><div class="what">Saldo: gegessen minus Verbrauch in kcal</div></div>';
     }
     if (evShow(st.sel)) h += '<div class="row"><span class="label">' + EV[st.sel].map(esc).join(" · ") + '<small>Ereignis</small></span><span class="value"><span class="num">★</span></span></div>';
-    h += row("Ruheenergie", fmt(x.ruhe), "kcal", "", "Apple Watch");
-    h += row("Aktivität", fmt(x.aktiv), "kcal", "", "Alltag " + fmt(x.alltag) + " · Workouts " + fmt(x.workouts) + (x.wn ? " (" + x.wn + ")" : ""));
-    if (x.stufe != null) h += row("Stufe", sgn(x.stufe), "kcal", "", wd(x.d) === "Sa" || wd(x.d) === "So" ? "Wochenende" : "Mo bis Fr");
-    h += row("Ziel", fmt(x.ziel), "kcal", "calc", x.ziel == null ? "" : x.stufe != null ? "Verbrauch " + fmt(x.verbrauch) + " + Stufe " + sgn(x.stufe) : "festes Ziel dieser Phase");
+    /* Rechnung des Tages: Grundumsatz + Alltag + Trainings = Verbrauch, plus Stufe = Ziel, dagegen gegessen */
+    h += row("Grundumsatz", fmt(x.ruhe), "kcal", "", "Ruheenergie, Apple Watch");
+    h += row("+ Alltag", fmt(x.alltag), "kcal", "", "Aktivität ohne Training");
+    var wk = WK[x.d];
+    if (wk && wk.length) {
+      wk.forEach(function (w) { h += row("+ " + wkLabel(w), fmt(w.kcal), "kcal", "", fmt(w.min) + " min"); });
+    } else if (x.workouts) {
+      h += row("+ Training", fmt(x.workouts), "kcal", "", x.wn ? x.wn + (x.wn === 1 ? " Workout" : " Workouts") : "");
+    }
+    h += row("= Verbrauch", fmt(x.verbrauch), "kcal", "sum", "Apple Watch gesamt");
+    if (x.stufe != null) {
+      h += row("+ Stufe", sgn(x.stufe), "kcal", "", wd(x.d) === "Sa" || wd(x.d) === "So" ? "Wochenende" : "Mo bis Fr");
+      h += row("= Ziel", fmt(x.ziel), "kcal", "calc", "Verbrauch + Stufe");
+    } else {
+      h += row("Ziel", fmt(x.ziel), "kcal", "calc", x.ziel == null ? "" : "festes Ziel dieser Phase");
+    }
     h += row("Gegessen", fmt(x.essen), "kcal", "calc");
     h += row("Saldo", x.saldo != null ? sgn(x.saldo) : "–", "kcal", "", "gegessen minus Verbrauch " + fmt(x.verbrauch));
     h += row("Eiweiß · KH · Fett", (x.p != null ? fmt(x.p) : "–") + " · " + (x.k != null ? fmt(x.k) : "–") + " · " + (x.f != null ? fmt(x.f) : "–"), "g");
@@ -972,7 +992,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   /* ---------- Laden ---------- */
   function loadCache() {
     var raw = lsGet(KEY_CACHE); if (!raw) return false;
-    try { var c = JSON.parse(raw); if (c && c.days && c.body) { setData(c.days, c.body, c.t, c.param, c.soll, c.ev, c.chk); return true; } } catch (e) { /* egal */ }
+    try { var c = JSON.parse(raw); if (c && c.days && c.body) { setData(c.days, c.body, c.t, c.param, c.soll, c.ev, c.chk, c.wk); return true; } } catch (e) { /* egal */ }
     return false;
   }
   var inflight = false;
@@ -985,8 +1005,8 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
       var m = metaParse(r[2]);
       inflight = false;
       var now = Date.now();
-      lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1], param: m.par, soll: m.soll, ev: m.ev, chk: m.chk }));
-      setData(r[0], r[1], now, m.par, m.soll, m.ev, m.chk);
+      lsSet(KEY_CACHE, JSON.stringify({ t: now, days: r[0], body: r[1], param: m.par, soll: m.soll, ev: m.ev, chk: m.chk, wk: m.wk }));
+      setData(r[0], r[1], now, m.par, m.soll, m.ev, m.chk, m.wk);
       infoEl.hidden = !evErr; if (evErr) infoEl.textContent = "Zusatzdaten nicht geladen (Parameter, Ereignisse, Checks): " + evErr;
       setStand("Stand " + clock(now), false); render();
     }).catch(function (e) {
