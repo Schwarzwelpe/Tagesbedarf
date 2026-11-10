@@ -126,6 +126,13 @@ header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.
 .row.calc { background: var(--calc-row); }
 .row.calc .value { font-weight: 800; font-size: 1.25rem; }
 .row.sum { border-top: 2px solid var(--axis); }
+.tw { overflow-x: auto; }
+table.t7 { font-size: 0.74rem; }
+table.t7 th, table.t7 td { padding: 7px 3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.t7 th { font-size: 0.64rem; }
+table.t7 th:first-child, table.t7 td:first-child { padding-left: 10px; }
+table.t7 th:last-child, table.t7 td:last-child { padding-right: 10px; }
+table.t7 td.b { font-weight: 700; }
 .row.sum .label { font-weight: 700; }
 .row.sum .value { font-weight: 800; }
 .unit { color: var(--muted); font-size: 0.75rem; font-weight: 600; }
@@ -288,7 +295,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.11.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.12.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -799,7 +806,18 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     });
     h += "</tbody>";
     if (n) h += "<tfoot><tr><td>Summe</td><td>" + fmt(sE) + "</td><td>" + fmt(sZ) + "</td><td>" + sgn(sum) + "</td></tr></tfoot>";
-    h += "</table></details></div>";
+    h += "</table></details>";
+
+    /* Rechnung je Tag: Ruhe + Alltag + Training + Stufe = Ziel, dagegen Essen. Training = alle Workouts des Tages, die Aufteilung steht im Tag. */
+    function avg(f) { var a = 0, c = 0; md.forEach(function (x) { var v = f(x); if (v != null) { a += v; c++; } }); return c ? a / c : null; }
+    h += '<details><summary>Rechnung je Tag</summary><div class="tw"><table class="t7"><thead><tr><th>Tag</th><th>Ruhe</th><th>Alltag</th><th>Training</th><th>Stufe</th><th>Ziel</th><th>Essen</th></tr></thead><tbody>';
+    md.slice().reverse().forEach(function (x) {
+      var s2 = stateOf(x.abw);
+      h += '<tr data-sel="' + x.d + '" data-goto="tag"><td>' + wd(x.d) + " " + dm(x.d) + "</td><td>" + fmt(x.ruhe) + "</td><td>" + fmt(x.alltag) + "</td><td>" + (x.workouts ? fmt(x.workouts) : "–") + "</td><td>" + (x.stufe != null ? sgn(x.stufe) : "–") + '</td><td class="b">' + fmt(x.ziel) + '</td><td class="b ' + (s2 && s2 !== "ok" ? "s-" + s2 : "") + '">' + fmt(x.essen) + "</td></tr>";
+    });
+    h += "</tbody>";
+    if (md.length) h += "<tfoot><tr><td>Ø</td><td>" + fmt(avg(function (x) { return x.ruhe; })) + "</td><td>" + fmt(avg(function (x) { return x.alltag; })) + "</td><td>" + fmt(avg(function (x) { return x.workouts || 0; })) + "</td><td>" + (avg(function (x) { return x.stufe; }) != null ? sgn(Math.round(avg(function (x) { return x.stufe; }))) : "–") + "</td><td>" + fmt(avg(function (x) { return x.ziel; })) + "</td><td>" + fmt(avg(function (x) { return x.essen; })) + "</td></tr></tfoot>";
+    h += '</table></div><div class="sub pad">Ziel = Ruhe + Alltag + Training + Stufe. Zeile antippen öffnet den Tag mit der Aufteilung der Trainings.</div></details></div>';
     el.innerHTML = h;
   }
 
