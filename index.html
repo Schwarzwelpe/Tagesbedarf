@@ -201,7 +201,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.5.2<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.6.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -294,8 +294,19 @@ button:disabled { opacity: 0.4; cursor: default; }
 (function () {
   var STORE_KEY = "tagesplanung-v2";
   var OLD_KEY = "tagesbedarf-v1";
-  /* Standard (auch nach Reset): Ruhe 2050, Alltag 300 (Rod: darunter kommt er praktisch nie, schlechtester Fall) */
-  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 300, surplus: 150, essen: 0 };
+  /* Standard (auch nach Reset): Ruhe 2050. Training 1 und Alltag je Wochentag: Werte, die seit 29.06.2026 an etwa 95 % der Tage
+     nicht unterschritten wurden (Apple Watch, Auswertung 10.11.2026). Alltag = aktive Kalorien minus Workouts inkl. Spaziergang,
+     Training 1 = Kraft Workout. Spaziergänge sind nicht eingerechnet und bleiben optional. Mo, Mi, Fr Studio; Di, Do Heimgym; Sa, So frei. */
+  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 280, surplus: 150, essen: 0 };
+  var DAY_T1 = [230, 160, 230, 160, 230, 0, 0];
+  var DAY_ALLTAG = [420, 310, 420, 310, 420, 280, 280];
+  function defOf(k, slot) {
+    var s = slot >= 0 && slot <= 6 ? slot : 0;
+    if (k === "surplus") return s >= 5 ? 0 : DEFAULTS.surplus;
+    if (k === "t1") return DAY_T1[s];
+    if (k === "alltag") return DAY_ALLTAG[s];
+    return DEFAULTS[k];
+  }
   var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
@@ -309,7 +320,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   function sanitize(obj, slot) {
     var out = {};
     KEYS.forEach(function (k) {
-      var def = (k === "surplus" && slot >= 5) ? 0 : DEFAULTS[k];
+      var def = defOf(k, slot);
       out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : def;
     });
     return out;
@@ -354,7 +365,7 @@ button:disabled { opacity: 0.4; cursor: default; }
     for (var i = 0; i < SLOT_COUNT; i++) {
       if (!isStale(i)) continue;
       var sl = data.slots[i];
-      RESET_KEYS.forEach(function (k) { if (sl[k] !== DEFAULTS[k]) { sl[k] = DEFAULTS[k]; if (i === data.active) changedActive = true; } });
+      RESET_KEYS.forEach(function (k) { var d0 = defOf(k, i); if (sl[k] !== d0) { sl[k] = d0; if (i === data.active) changedActive = true; } });
     }
     return changedActive;
   }
@@ -459,13 +470,13 @@ button:disabled { opacity: 0.4; cursor: default; }
   var copyBtn = document.getElementById("copy");
   var pasteBtn = document.getElementById("paste");
   copyBtn.addEventListener("click", function () {
-    data.clip = sanitize(cur());
+    data.clip = sanitize(cur(), data.active);
     save(); renderSlots();
     flash(copyBtn, "Kopiert", "Kopieren");
   });
   pasteBtn.addEventListener("click", function () {
     if (!data.clip) return;
-    data.slots[data.active] = sanitize(data.clip);
+    data.slots[data.active] = sanitize(data.clip, data.active);
     changed(); writeInputs(); update();
     flash(pasteBtn, "Eingefügt", "Einfügen");
   });
@@ -487,7 +498,7 @@ button:disabled { opacity: 0.4; cursor: default; }
       return;
     }
     disarm();
-    RESET_KEYS.forEach(function (k) { cur()[k] = DEFAULTS[k]; });
+    RESET_KEYS.forEach(function (k) { cur()[k] = defOf(k, data.active); });
     changed(); writeInputs(); update();
   });
 
