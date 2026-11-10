@@ -178,6 +178,8 @@ button:disabled { opacity: 0.4; cursor: default; }
 .actions .copy:active { background: color-mix(in srgb, var(--total-bg) 82%, black); }
 .actions .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
 .actions .reset.armed { border-color: var(--danger); color: var(--danger); }
+.resetnote { padding: 0 6px; font-size: 0.72rem; line-height: 1.45; color: var(--muted); }
+.resetnote[hidden] { display: none; }
 
 
 .slots {
@@ -201,7 +203,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.6.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.7.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -276,6 +278,7 @@ button:disabled { opacity: 0.4; cursor: default; }
     <button type="button" id="paste" disabled>Einfügen</button>
     <button type="button" class="reset" id="reset">Reset</button>
   </div>
+  <div class="resetnote" id="reset-note" hidden></div>
 </main>
 
 <nav class="slots" aria-label="Wochentag wählen">
@@ -315,6 +318,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   function dayNum(ts) { var d = new Date(ts); return d.getFullYear() * 400 + d.getMonth() * 32 + d.getDate(); }
   var nf = new Intl.NumberFormat("de-DE");
   var inputs = {};
+  var noteEl = document.getElementById("reset-note");
 
   /* Stufe Standard: Mo bis Fr +150, Sa und So 0 (Lean Gain Phase 3); ändert sich die Stufe, hier und in den Stufen Buttons anpassen */
   function sanitize(obj, slot) {
@@ -326,11 +330,14 @@ button:disabled { opacity: 0.4; cursor: default; }
     return out;
   }
 
+  function tsOf(v) { v = Number(v); return (isFinite(v) && v > 0) ? v : 0; }
   /* meta je Slot für den Sync: base = Stand in Neon, den dieses Gerät zuletzt gesehen hat, dirty = lokal geändert und noch nicht gesendet,
-     lt = Zeitpunkt der letzten lokalen Änderung, touched = Slot enthält echte Werte (ein frisches Gerät mit Standardwerten sendet nichts) */
+     lt = Zeitpunkt der letzten lokalen Änderung, touched = Slot enthält echte Werte (ein frisches Gerät mit Standardwerten sendet nichts),
+     rs = letzter Reset von Hand (geht mit nach Neon, damit beide Geräte ihn kennen), ra = letzter automatischer Reset (rechnet jedes Gerät gleich aus) */
   var data = { active: 0, slots: [], clip: null, meta: [] };
   function newMeta(m, touched) {
-    return { base: (m && typeof m.base === "string") ? m.base : null, dirty: !!(m && m.dirty), lt: (m && isFinite(Number(m.lt))) ? Number(m.lt) : 0, rev: 0, touched: m ? !!m.touched : touched };
+    return { base: (m && typeof m.base === "string") ? m.base : null, dirty: !!(m && m.dirty), lt: (m && isFinite(Number(m.lt))) ? Number(m.lt) : 0, rev: 0, touched: m ? !!m.touched : touched,
+             rs: tsOf(m && m.rs), ra: tsOf(m && m.ra) };
   }
   for (var i = 0; i < SLOT_COUNT; i++) { data.slots.push(sanitize(null, i)); data.meta.push(newMeta(null, false)); }
 
@@ -350,22 +357,24 @@ button:disabled { opacity: 0.4; cursor: default; }
     } catch (e) { /* ohne Speicher weiterarbeiten */ }
   }
   /* Wochentage: Jeder Slot gehört zum nächsten Auftreten seines Wochentags ab dem Tag der letzten Änderung (Plan am Sonntag für Montag
-     gilt für den kommenden Montag). Liegt dieser Tag in der Vergangenheit, ist der Plan abgelaufen: Training, Alltag und Essen
-     springen auf 0 wie beim Reset (Ruhe und Stufe bleiben). Das passiert nur in der Anzeige und ändert nichts an Neon; jedes Gerät
-     rechnet es aus dem Zeitstempel der letzten Änderung selbst aus. */
-  function isStale(i) {
+     gilt für den kommenden Montag). Der Plan eines Tages bleibt an diesem Tag und am Folgetag stehen; am übernächsten Tag um 00:00
+     ist er abgelaufen: Training, Alltag und Essen springen auf die Standardwerte wie beim Reset (Ruhe und Stufe bleiben). Das passiert
+     nur in der Anzeige und ändert nichts an Neon; jedes Gerät rechnet es aus dem Zeitstempel der letzten Änderung selbst aus. */
+  var GRACE_DAYS = 2;
+  function expiryOf(i) {
     var lt = data.meta[i].lt;
-    if (!lt) return false;
+    if (!lt) return 0;
     var e = new Date(lt), add = (i - ((e.getDay() + 6) % 7) + 7) % 7;
-    var target = new Date(e.getFullYear(), e.getMonth(), e.getDate() + add).getTime();
-    return dayNum(target) < dayNum(Date.now());
+    return new Date(e.getFullYear(), e.getMonth(), e.getDate() + add + GRACE_DAYS).getTime();
   }
+  function isStale(i) { var x = expiryOf(i); return x > 0 && x <= Date.now(); }
   function expire() {
     var changedActive = false;
     for (var i = 0; i < SLOT_COUNT; i++) {
       if (!isStale(i)) continue;
-      var sl = data.slots[i];
-      RESET_KEYS.forEach(function (k) { var d0 = defOf(k, i); if (sl[k] !== d0) { sl[k] = d0; if (i === data.active) changedActive = true; } });
+      var sl = data.slots[i], did = false;
+      RESET_KEYS.forEach(function (k) { var d0 = defOf(k, i); if (sl[k] !== d0) { sl[k] = d0; did = true; } });
+      if (did) { data.meta[i].ra = expiryOf(i); if (i === data.active) changedActive = true; }
     }
     return changedActive;
   }
@@ -396,7 +405,26 @@ button:disabled { opacity: 0.4; cursor: default; }
     return (r < 0 ? "−" : "") + nf.format(Math.abs(r));
   }
 
+  function when(ts) {
+    var d = new Date(ts);
+    return DAY_SHORT[(d.getDay() + 6) % 7] + " " + d.getDate() + "." + (d.getMonth() + 1) + "., " + clock(ts);
+  }
+  /* Hinweis unter den Tasten: letzter Reset dieses Wochentags (wann, von Hand oder automatisch) und wann der nächste automatische kommt */
+  function renderNote() {
+    var i = data.active, m = data.meta[i], sl = data.slots[i], lines = [];
+    if (m.rs || m.ra) {
+      var user = m.rs >= m.ra;
+      lines.push("Zuletzt zurückgesetzt: " + (user ? "von Hand" : "automatisch") + ", " + when(user ? m.rs : m.ra));
+    }
+    var x = expiryOf(i);
+    if (x > Date.now() && RESET_KEYS.some(function (k) { return sl[k] !== defOf(k, i); })) lines.push("Automatischer Reset: " + when(x));
+    noteEl.textContent = "";
+    lines.forEach(function (t) { var d = document.createElement("div"); d.textContent = t; noteEl.appendChild(d); });
+    noteEl.hidden = lines.length === 0;
+  }
+
   function update() {
+    renderNote();
     var r = calc(cur());
     document.getElementById("out-aktivitaet").textContent = fmt(r.aktivitaet);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
@@ -499,6 +527,7 @@ button:disabled { opacity: 0.4; cursor: default; }
     }
     disarm();
     RESET_KEYS.forEach(function (k) { cur()[k] = defOf(k, data.active); });
+    data.meta[data.active].rs = Date.now();
     changed(); writeInputs(); update();
   });
 
@@ -558,12 +587,18 @@ button:disabled { opacity: 0.4; cursor: default; }
     });
   }
   function qPush(slot) {
-    var js = JSON.stringify(sanitize(data.slots[slot], slot)).replace(/'/g, "''");
+    var o = sanitize(data.slots[slot], slot);
+    if (data.meta[slot].rs) o.rs = data.meta[slot].rs;   /* Zeitpunkt des letzten Resets von Hand */
+    var js = JSON.stringify(o).replace(/'/g, "''");
     return "insert into public.tagesplanung_sync (slot, data, updated_at) values (" + (slot | 0) + ", '" + js + "'::jsonb, now()) on conflict (slot) do update set data = excluded.data, updated_at = now() returning floor(extract(epoch from updated_at)*1000)::bigint::text as v";
   }
   function parseVals(d, slot) {
     try { var o = typeof d === "string" ? JSON.parse(d) : d; if (o && typeof o === "object" && KEYS.some(function (k) { return typeof o[k] === "number" && isFinite(o[k]); })) return sanitize(o, slot); } catch (e) { /* ungültige Zeile zählt als leer */ }
     return null;
+  }
+
+  function parseRs(d) {
+    try { var o = typeof d === "string" ? JSON.parse(d) : d; return o && typeof o === "object" ? tsOf(o.rs) : 0; } catch (e) { return 0; }
   }
 
   function schedulePush() {
@@ -580,16 +615,18 @@ button:disabled { opacity: 0.4; cursor: default; }
     busy = true; setNet("wait");
     return run(Q_PULL).then(function (rows) {
       var by = {}, pushes = [], adoptedActive = false;
-      rows.forEach(function (r) { var n = Number(r.slot), vals = (n >= 0 && n < SLOT_COUNT) ? parseVals(r.data, n) : null; if (vals) by[n] = { v: String(r.v), vals: vals }; });
+      rows.forEach(function (r) { var n = Number(r.slot), vals = (n >= 0 && n < SLOT_COUNT) ? parseVals(r.data, n) : null; if (vals) by[n] = { v: String(r.v), vals: vals, rs: parseRs(r.data) }; });
       for (var s = 0; s < SLOT_COUNT; s++) {
         var m = data.meta[s], row = by[s];
         if (!row) { if (m.touched) pushes.push(s); continue; }   /* in Neon noch leer: nur senden, wenn hier echte Werte stehen */
+        if (row.rs > m.rs) m.rs = row.rs;   /* Reset von Hand auf dem anderen Gerät: den späteren Zeitpunkt behalten */
         if (row.v === m.base) { if (m.dirty) pushes.push(s); continue; }
         if (m.dirty && m.lt > Number(row.v)) { pushes.push(s); continue; }   /* lokal neuer als Neon */
         data.slots[s] = row.vals; m.base = row.v; m.dirty = false; m.touched = true; m.lt = Number(row.v);   /* Neon ist neuer: übernehmen */
         if (s === data.active) adoptedActive = true;
       }
       if (expire()) adoptedActive = true;
+      renderNote();
       if (adoptedActive || pushes.length === 0) save();
       if (adoptedActive) {
         if (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key) deferApply = true;
