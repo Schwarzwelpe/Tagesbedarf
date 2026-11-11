@@ -172,12 +172,12 @@ button:disabled { opacity: 0.4; cursor: default; }
 .rest .unit { color: inherit; opacity: 0.8; }
 .rest.over { background: var(--danger-bg); color: var(--danger); }
 
-/* Hero: Essen, Aktivität Ist, Gesamt und Rest immer oben und beim Scrollen sichtbar */
+/* Hero: Essen geplant und Aktivität Ist oben und beim Scrollen sichtbar; Gesamt und Rest stehen unten in denselben Spalten */
 .hero { position: sticky; top: 0; z-index: 4; display: grid; gap: 8px; background: var(--bg); padding: 2px 0 6px; }
 @media (display-mode: standalone) { .hero { top: 44px; } }
 html.standalone .hero { top: 44px; }
 .hin2 { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }
-.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 78px; padding: 8px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
+.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 84px; padding: 8px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
 .hcard:focus-within { border-color: var(--focus); }
 .hcard .hl { font-size: 0.78rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
 .hcard .hv { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
@@ -193,8 +193,8 @@ html.standalone .hero { top: 44px; }
 .hcard.ist.on { background: var(--total-bg); border-color: var(--total-bg); }
 .hcard.ist.on .hl, .hcard.ist.on .unit { color: color-mix(in srgb, var(--total-ink) 78%, transparent); }
 .hcard.ist.on input { color: var(--total-ink); }
-.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 74px; padding: 8px 14px; border-radius: 14px; }
+.tiles { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }   /* gleiche Spalten wie die Karten oben (.hin2) */
+.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 84px; padding: 8px 14px; border: 1.5px solid transparent; border-radius: 14px; }
 .tile.rest { border-top: 0; }
 .tile .tl { font-size: 0.78rem; font-weight: 700; opacity: 0.85; }
 .tile .tv { display: flex; align-items: baseline; gap: 6px; }
@@ -240,7 +240,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.8.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.8.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -252,7 +252,7 @@ html.standalone .hero { top: 44px; }
     <div class="synclink" id="sync-actions" hidden><button type="button" class="linkbtn" id="sync-out">Zugang zurücksetzen</button></div>
   </section>
 
-  <section class="hero" aria-label="Essen, Aktivität Ist, Gesamt und Rest">
+  <section class="hero" aria-label="Essen geplant und Aktivität Ist">
     <div class="hin2">
       <label class="hcard essen" for="essen">
         <span class="hl">Essen geplant</span>
@@ -262,10 +262,6 @@ html.standalone .hero { top: 44px; }
         <span class="hl">Aktivität Ist</span>
         <span class="hv"><input id="ist" data-key="ist" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off" placeholder="Plan"><span class="unit">kcal</span></span>
       </label>
-    </div>
-    <div class="tiles" aria-live="polite">
-      <div class="tile total"><span class="tl">Gesamt</span><span class="tv"><span class="num" id="out-gesamt">0</span><span class="unit">kcal</span></span></div>
-      <div class="tile rest" id="rest-box"><span class="tl" id="rest-label">Noch zu essen</span><span class="tv"><span class="num" id="out-rest">0</span><span class="unit">kcal</span></span></div>
     </div>
   </section>
 
@@ -316,6 +312,11 @@ html.standalone .hero { top: 44px; }
     </div>
 
   </section>
+
+  <div class="tiles" aria-live="polite">
+    <div class="tile total"><span class="tl">Gesamt</span><span class="tv"><span class="num" id="out-gesamt">0</span><span class="unit">kcal</span></span></div>
+    <div class="tile rest" id="rest-box"><span class="tl" id="rest-label">Noch zu essen</span><span class="tv"><span class="num" id="out-rest">0</span><span class="unit">kcal</span></span></div>
+  </div>
 
   <div class="actions">
     <button type="button" class="copy" id="copy">Kopieren</button>
