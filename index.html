@@ -178,7 +178,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 @media (display-mode: standalone) { .hero { top: 44px; } }
 html.standalone .hero { top: 44px; }
 .hin2 { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }
-.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 70px; padding: 6px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
+.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 72px; padding: 6px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
 .hcard:focus-within { border-color: var(--focus); }
 .hcard .hl { font-size: 0.78rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
 .hcard .hv { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
@@ -195,7 +195,7 @@ html.standalone .hero { top: 44px; }
 .hcard.ist.on .hl, .hcard.ist.on .unit { color: color-mix(in srgb, var(--total-ink) 78%, transparent); }
 .hcard.ist.on input { color: var(--total-ink); }
 .tiles { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }   /* gleiche Spalten wie die Karten oben (.hin2) */
-.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 70px; padding: 6px 14px; border: 1.5px solid transparent; border-radius: 14px; }
+.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 72px; padding: 6px 14px; border: 1.5px solid transparent; border-radius: 14px; }
 .tile.rest { border-top: 0; }
 .tile .tl { font-size: 0.78rem; font-weight: 700; opacity: 0.85; }
 .hin2 > *, .tiles > * { min-width: 0; }
@@ -255,7 +255,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.3<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.4<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
