@@ -172,6 +172,43 @@ button:disabled { opacity: 0.4; cursor: default; }
 .rest .unit { color: inherit; opacity: 0.8; }
 .rest.over { background: var(--danger-bg); color: var(--danger); }
 
+/* Hero: Essen, Aktivität Ist, Gesamt und Rest immer oben und beim Scrollen sichtbar */
+.hero { position: sticky; top: 0; z-index: 4; display: grid; gap: 8px; background: var(--bg); padding: 2px 0 6px; }
+@media (display-mode: standalone) { .hero { top: 44px; } }
+html.standalone .hero { top: 44px; }
+.hin2 { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }
+.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 78px; padding: 8px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
+.hcard:focus-within { border-color: var(--focus); }
+.hcard .hl { font-size: 0.78rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
+.hcard .hv { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.hcard input {
+  width: 100%; min-width: 0; height: 46px; text-align: left; padding: 0; border: 0; background: transparent; border-radius: 8px;
+  font: 800 2.3rem/1 var(--font); font-variant-numeric: tabular-nums; color: var(--input-ink); letter-spacing: -0.02em;
+  touch-action: manipulation; -moz-appearance: textfield; appearance: textfield;
+}
+.hcard.ist input { font-size: 1.7rem; }
+.hcard input::placeholder { color: var(--muted); opacity: 0.55; font-weight: 700; }
+.hcard input::-webkit-outer-spin-button, .hcard input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.hcard input:focus-visible { outline: none; }
+.hcard.ist.on { background: var(--total-bg); border-color: var(--total-bg); }
+.hcard.ist.on .hl, .hcard.ist.on .unit { color: color-mix(in srgb, var(--total-ink) 78%, transparent); }
+.hcard.ist.on input { color: var(--total-ink); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 74px; padding: 8px 14px; border-radius: 14px; }
+.tile.rest { border-top: 0; }
+.tile .tl { font-size: 0.78rem; font-weight: 700; opacity: 0.85; }
+.tile .tv { display: flex; align-items: baseline; gap: 6px; }
+.tile .num { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.tile.total .unit { color: color-mix(in srgb, var(--total-ink) 72%, transparent); }
+.tile.rest .unit { color: inherit; opacity: 0.8; }
+.row.input.off .value input { opacity: 0.35; }
+.row.input.off .label { color: var(--muted); }
+.mode { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; background: var(--line); color: var(--ink); vertical-align: 2px; }
+.mode.ist { background: var(--total-bg); color: var(--total-ink); }
+.row.derived { font-weight: 600; }
+.row.derived[hidden] { display: none; }
+.row small { display: block; font-size: 0.7rem; font-weight: 500; color: var(--muted); line-height: 1.2; }
+
 .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .actions button { min-height: 44px; border-radius: 12px; }
 .actions .copy { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
@@ -203,7 +240,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.7.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.8.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -213,6 +250,23 @@ button:disabled { opacity: 0.4; cursor: default; }
       <button type="button" id="sync-save">Speichern und abgleichen</button>
     </div>
     <div class="synclink" id="sync-actions" hidden><button type="button" class="linkbtn" id="sync-out">Zugang zurücksetzen</button></div>
+  </section>
+
+  <section class="hero" aria-label="Essen, Aktivität Ist, Gesamt und Rest">
+    <div class="hin2">
+      <label class="hcard essen" for="essen">
+        <span class="hl">Essen geplant</span>
+        <span class="hv"><input id="essen" data-key="essen" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
+      </label>
+      <label class="hcard ist" id="ist-card" for="ist">
+        <span class="hl">Aktivität Ist</span>
+        <span class="hv"><input id="ist" data-key="ist" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off" placeholder="Plan"><span class="unit">kcal</span></span>
+      </label>
+    </div>
+    <div class="tiles" aria-live="polite">
+      <div class="tile total"><span class="tl">Gesamt</span><span class="tv"><span class="num" id="out-gesamt">0</span><span class="unit">kcal</span></span></div>
+      <div class="tile rest" id="rest-box"><span class="tl" id="rest-label">Noch zu essen</span><span class="tv"><span class="num" id="out-rest">0</span><span class="unit">kcal</span></span></div>
+    </div>
   </section>
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
@@ -232,13 +286,17 @@ button:disabled { opacity: 0.4; cursor: default; }
       <span class="label">Training 3</span>
       <span class="value"><input id="t3" data-key="t3" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
-    <label class="row input" for="alltag">
+    <label class="row input" for="alltag" id="alltag-row">
       <span class="label">Alltag</span>
       <span class="value"><input id="alltag" data-key="alltag" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
 
+    <div class="row calc derived" id="derived-row" hidden>
+      <span class="label">Alltag errechnet<small id="derived-note">Ist minus Trainings</small></span>
+      <span class="value"><span class="num" id="out-derived">0</span><span class="unit">kcal</span></span>
+    </div>
     <div class="row calc">
-      <span class="label">Aktivität</span>
+      <span class="label">Aktivität <span class="mode" id="mode-badge">Plan</span></span>
       <span class="value"><span class="num" id="out-aktivitaet">0</span><span class="unit">kcal</span></span>
     </div>
     <div class="row calc">
@@ -257,20 +315,6 @@ button:disabled { opacity: 0.4; cursor: default; }
       <button type="button" data-step="50">+50</button>
     </div>
 
-    <div class="big total" aria-live="polite">
-      <span class="label">Gesamt</span>
-      <span class="value"><span class="num" id="out-gesamt">0</span><span class="unit">kcal</span></span>
-    </div>
-
-    <label class="row input" for="essen">
-      <span class="label">Essen eingeplant</span>
-      <span class="value"><input id="essen" data-key="essen" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
-    </label>
-
-    <div class="big rest" id="rest-box" aria-live="polite">
-      <span class="label" id="rest-label">Noch zu essen</span>
-      <span class="value"><span class="num" id="out-rest">0</span><span class="unit">kcal</span></span>
-    </div>
   </section>
 
   <div class="actions">
@@ -300,7 +344,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   /* Standard (auch nach Reset): Ruhe 2050. Training 1 und Alltag je Wochentag: Werte, die seit 29.06.2026 an etwa 95 % der Tage
      nicht unterschritten wurden (Apple Watch, Auswertung 10.11.2026). Alltag = aktive Kalorien minus Workouts inkl. Spaziergang,
      Training 1 = Kraft Workout. Spaziergänge sind nicht eingerechnet und bleiben optional. Mo, Mi, Fr Studio; Di, Do Heimgym; Sa, So frei. */
-  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 280, surplus: 150, essen: 0 };
+  var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 280, surplus: 150, essen: 0, ist: 0 };   /* ist = Aktivität gesamt, gemessen (Yazio Verbrannt); 0 = leer, es gilt der Plan */
   var DAY_T1 = [230, 160, 230, 160, 230, 0, 0];
   var DAY_ALLTAG = [420, 310, 420, 310, 420, 280, 280];
   function defOf(k, slot) {
@@ -310,7 +354,7 @@ button:disabled { opacity: 0.4; cursor: default; }
     if (k === "alltag") return DAY_ALLTAG[s];
     return DEFAULTS[k];
   }
-  var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen"];
+  var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen", "ist"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
   var DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];   /* kurz, damit die Kopfzeile bei keinem Wochentag umbricht */
@@ -392,12 +436,14 @@ button:disabled { opacity: 0.4; cursor: default; }
   function cur() { return data.slots[data.active]; }
   var loadDay = dayNum(Date.now());
 
+  /* Plan: Training 1 bis 3 plus Alltag. Ist (gemessene Aktivität gesamt) enthält die Trainings schon und ersetzt beide; der Alltag ergibt sich dann als Ist minus Trainings. */
   function calc(s) {
-    var aktivitaet = s.t1 + s.t2 + s.t3 + s.alltag;
+    var tr = s.t1 + s.t2 + s.t3, ist = s.ist > 0;
+    var aktivitaet = ist ? s.ist : tr + s.alltag;
     var zwischen = s.ruhe + aktivitaet;
     var gesamt = zwischen + s.surplus;
     var rest = gesamt - s.essen;
-    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest };
+    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr };
   }
   function fmt(n) { return nf.format(Math.round(n)); }
   function fmtSigned(n) {
@@ -433,10 +479,17 @@ button:disabled { opacity: 0.4; cursor: default; }
     var over = r.rest < 0;
     document.getElementById("rest-box").classList.toggle("over", over);
     document.getElementById("rest-label").textContent = over ? "Über dem Ziel" : "Noch zu essen";
+    /* Plan oder Ist: leer = Plan, gefüllt = Ist; man sieht es an der Karte, am Kennzeichen bei Aktivität und am abgedunkelten Alltag */
+    document.getElementById("ist-card").classList.toggle("on", r.ist);
+    document.getElementById("alltag-row").classList.toggle("off", r.ist);
+    var mb = document.getElementById("mode-badge"); mb.textContent = r.ist ? "Ist" : "Plan"; mb.classList.toggle("ist", r.ist);
+    var dr = document.getElementById("derived-row"); dr.hidden = !r.ist;
+    document.getElementById("out-derived").textContent = fmtSigned(r.alltagIst);
+    document.getElementById("derived-note").textContent = r.alltagIst < 0 ? "Trainings noch nicht komplett gelaufen" : "Ist minus Trainings";
   }
   function writeInputs() {
     var s = cur();
-    KEYS.forEach(function (k) { inputs[k].value = s[k]; });
+    KEYS.forEach(function (k) { inputs[k].value = (k === "ist" && !s[k]) ? "" : s[k]; });
   }
   function renderSlots() {
     document.querySelectorAll("button[data-slot]").forEach(function (b) {
