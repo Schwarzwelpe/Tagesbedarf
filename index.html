@@ -254,7 +254,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -364,7 +364,7 @@ html.standalone .hero { top: 44px; }
   /* Trainingstypen und ihr Standardwert in kcal: Wert, der seit 29.06.2026 bei 95 % der Einheiten nicht unterschritten wurde (Apple Watch, Auswertung 11.11.2026):
      Gym (Studio) 232, Homegym 164; Spaziergänge in zwei Gruppen (Grenze 240 kcal, dazwischen gibt es kaum Werte): klein 90 (n 113, Median 184), groß 261 (n 43, Median 294).
      "Anderes" lässt den Wert stehen. */
-  var TYPES = [["", "Kein Training", 0], ["gym", "Gym", 230], ["home", "Homegym", 160], ["klein", "Kleiner Spaziergang", 90], ["gross", "Großer Spaziergang", 260], ["frei", "Anderes", null]];
+  var TYPES = [["", "Kein Training", 0], ["gym", "Gym", 230], ["home", "Homegym", 160], ["klein", "Kleiner Spaziergang", 150], ["gross", "Großer Spaziergang", 190], ["oez", "OEZ Runde", 65], ["frei", "Anderes", null]];
   var TYPE_MAP = {}; TYPES.forEach(function (t) { TYPE_MAP[t[0]] = t; });
   var TKEYS = ["a1", "a2", "a3"];   /* Typ von Training 1 bis 3 */
   /* Training 1 vorausgewählt: Mo, Mi, Fr Gym, Di, Do Homegym, Sa und So kein Training; Training 2 und 3 sind optional */
@@ -373,7 +373,7 @@ html.standalone .hero { top: 44px; }
   function inferType(n, kcal) {
     if (!kcal) return "";
     if (n === 1) return kcal === 230 ? "gym" : kcal === 160 ? "home" : "frei";
-    return kcal === 160 ? "klein" : kcal === 280 ? "gross" : "frei";
+    return (kcal === 150 || kcal === 160) ? "klein" : (kcal === 190 || kcal === 260 || kcal === 280) ? "gross" : (kcal === 65 || kcal === 90) ? "oez" : "frei";
   }
   var DAY_ALLTAG = [420, 310, 420, 310, 420, 280, 280];
   function defOf(k, slot) {
