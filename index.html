@@ -35,9 +35,9 @@
   --danger: #b3261e;
   --danger-bg: #fdeceb;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
-  --row-h: clamp(34px, 4.9dvh, 44px);
+  --row-h: clamp(34px, 4.4dvh, 42px);
   --big-h: clamp(54px, 8dvh, 68px);
-  --bar-h: 62px;
+  --bar-h: 49px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -70,16 +70,16 @@ body {
   padding:
     max(10px, calc(env(safe-area-inset-top) * 1.4))
     max(14px, env(safe-area-inset-right))
-    calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px)
+    calc(var(--bar-h) + max(10px, env(safe-area-inset-bottom)) + 8px)
     max(14px, env(safe-area-inset-left));
 }
 /* Home Bildschirm Modus: iOS meldet dort keinen oberen Sicherheitsabstand, der Titel läge im Unschärfebereich der Statusleiste */
 @media (display-mode: standalone) {
-  body { padding-top: max(48px, calc(env(safe-area-inset-top) * 1.4)); }
+  body { padding-top: max(48px, calc(env(safe-area-inset-top) + 6px)); }
 }
-html.standalone body { padding-top: max(48px, calc(env(safe-area-inset-top) * 1.4)); }
+html.standalone body { padding-top: max(48px, calc(env(safe-area-inset-top) + 6px)); }
 
-main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
 
 header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 0 4px; }
 header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.015em; }
@@ -148,7 +148,8 @@ button.linkbtn.armed { color: var(--danger); }
 .row input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; background: color-mix(in srgb, var(--input-ink) 8%, transparent); }
 .row.calc .num { font-size: 1.3rem; font-weight: 800; }
 
-.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 6px 14px 8px; background: var(--input-row); border-bottom: 1px solid var(--line); }
+.chips button { min-height: 32px; }
+.chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 14px 6px; background: var(--input-row); border-bottom: 1px solid var(--line); }
 
 button {
   font: 700 0.95rem var(--font); cursor: pointer; touch-action: manipulation;
@@ -173,20 +174,20 @@ button:disabled { opacity: 0.4; cursor: default; }
 .rest.over { background: var(--danger-bg); color: var(--danger); }
 
 /* Hero: Essen geplant und Aktivität Ist oben und beim Scrollen sichtbar; Gesamt und Rest stehen unten in denselben Spalten */
-.hero { position: sticky; top: 0; z-index: 4; display: grid; gap: 8px; background: var(--bg); padding: 2px 0 6px; }
+.hero { position: sticky; top: 0; z-index: 4; display: grid; gap: 6px; background: var(--bg); padding: 2px 0 4px; }
 @media (display-mode: standalone) { .hero { top: 44px; } }
 html.standalone .hero { top: 44px; }
 .hin2 { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }
-.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 84px; padding: 8px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
+.hcard { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 70px; padding: 6px 14px; background: var(--input-row); border: 1.5px solid var(--line); border-radius: 14px; }
 .hcard:focus-within { border-color: var(--focus); }
 .hcard .hl { font-size: 0.78rem; font-weight: 700; color: var(--muted); letter-spacing: 0.01em; }
 .hcard .hv { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .hcard input {
-  width: 100%; min-width: 0; height: 46px; text-align: left; padding: 0; border: 0; background: transparent; border-radius: 8px;
-  font: 800 2.3rem/1 var(--font); font-variant-numeric: tabular-nums; color: var(--input-ink); letter-spacing: -0.02em;
+  width: 100%; min-width: 0; height: 40px; text-align: left; padding: 0; border: 0; background: transparent; border-radius: 8px;
+  font: 800 2.1rem/1 var(--font); font-variant-numeric: tabular-nums; color: var(--input-ink); letter-spacing: -0.02em;
   touch-action: manipulation; -moz-appearance: textfield; appearance: textfield;
 }
-.hcard.ist input { font-size: 1.7rem; }
+.hcard.ist input { font-size: 1.6rem; }
 .hcard input::placeholder { color: var(--muted); opacity: 0.55; font-weight: 700; }
 .hcard input::-webkit-outer-spin-button, .hcard input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .hcard input:focus-visible { outline: none; }
@@ -194,22 +195,22 @@ html.standalone .hero { top: 44px; }
 .hcard.ist.on .hl, .hcard.ist.on .unit { color: color-mix(in srgb, var(--total-ink) 78%, transparent); }
 .hcard.ist.on input { color: var(--total-ink); }
 .tiles { display: grid; grid-template-columns: 1.45fr 1fr; gap: 8px; }   /* gleiche Spalten wie die Karten oben (.hin2) */
-.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 84px; padding: 8px 14px; border: 1.5px solid transparent; border-radius: 14px; }
+.tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 70px; padding: 6px 14px; border: 1.5px solid transparent; border-radius: 14px; }
 .tile.rest { border-top: 0; }
 .tile .tl { font-size: 0.78rem; font-weight: 700; opacity: 0.85; }
 .hin2 > *, .tiles > * { min-width: 0; }
 .tile .tv { display: flex; align-items: baseline; gap: 6px; }
-.tile .num { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.tile .num { font-size: 1.95rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
 .tile.total .unit { color: color-mix(in srgb, var(--total-ink) 72%, transparent); }
 .tile.rest .unit { color: inherit; opacity: 0.8; }
 @media (max-width: 340px) { .tile, .hcard { padding-left: 10px; padding-right: 10px; } .tile .num { font-size: 1.6rem; } .hcard input { font-size: 1.9rem; } .hcard.ist input { font-size: 1.4rem; } }
 /* Training 1 bis 3: oben klein die Nummer, darunter die Auswahl des Trainingstyps (setzt den Standardwert, der Wert bleibt änderbar) */
-.trow .tlab { display: flex; flex-direction: column; min-width: 0; flex: 1; padding: 2px 0; }
+.trow .tlab { display: flex; flex-direction: column; min-width: 0; flex: 1; padding: 0; }
 .trow .tn { font-size: 0.7rem; font-weight: 600; color: var(--muted); line-height: 1.15; }
 .tsw { position: relative; display: inline-block; max-width: 100%; align-self: flex-start; }
 .tsw::after { content: "▾"; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: var(--input-ink); pointer-events: none; }
 .tsel {
-  -webkit-appearance: none; appearance: none; max-width: 100%; min-height: 28px; padding: 2px 22px 2px 0; margin: 0;
+  -webkit-appearance: none; appearance: none; max-width: 100%; min-height: 24px; padding: 0 22px 0 0; margin: 0;
   background: transparent; border: 0; border-radius: 8px; color: var(--ink); font: 700 1.02rem var(--font);
   text-overflow: ellipsis; touch-action: manipulation; cursor: pointer;
 }
@@ -224,7 +225,7 @@ html.standalone .hero { top: 44px; }
 .row small { display: block; font-size: 0.7rem; font-weight: 500; color: var(--muted); line-height: 1.2; }
 
 .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.actions button { min-height: 44px; border-radius: 12px; }
+.actions button { min-height: 40px; border-radius: 12px; }
 .actions .copy { background: var(--total-bg); border-color: var(--total-bg); color: var(--total-ink); }
 .actions .copy:active { background: color-mix(in srgb, var(--total-bg) 82%, black); }
 .actions .reset { border-color: var(--line); color: var(--muted); background: var(--surface); }
@@ -236,11 +237,11 @@ html.standalone .hero { top: 44px; }
 .slots {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
   background: var(--surface); border-top: 1px solid var(--line);
-  padding: 8px max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  padding: 6px max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
 }
 .slots .inner { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .slots button {
-  min-height: 44px; border-radius: 12px; font-size: 0.92rem; padding: 0; position: relative;
+  min-height: 42px; border-radius: 12px; font-size: 0.92rem; padding: 0; position: relative;
   border-color: var(--line); color: var(--muted); background: transparent;
 }
 .slots button.today::after {
@@ -254,7 +255,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.2<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.3<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
