@@ -295,7 +295,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.12.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.13.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -636,24 +636,39 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     if (next) h += row(next.art === "zwischen" ? "Nächster Zwischencheck" : "Nächster Check", dm(next.d), "", "", wd(next.d) + ", in " + diffDays(t0, next.d) + (diffDays(t0, next.d) === 1 ? " Tag" : " Tagen") + (next.art === "zwischen" ? ", Zwischencheck, nur bei klarem Signal (ab +" + f2(T.zwSenken) + " oder " + MINUS + f2(Math.abs(T.zwErhoehen)) + " und weniger)" : ", Trend der 28 Tage davor"));
     /* Kurs: Waage gegen Kalorien, nur im Aufbau */
     if (aufbau) {
-      var dn = 0, dsum = 0, dcut = addDays(x.d, -(T.driftTage - 1));
-      c.ds.forEach(function (d) { if (d.d >= dcut && d.abw != null) { dn++; dsum += d.abw; } });
-      if (dn >= 7 && Math.abs(dsum / dn) > T.driftKcal) h += row("Drift Warnung", '<span class="s-rot">● ' + (dsum > 0 ? "über Ziel" : "unter Ziel") + "</span>", "", "", "Abweichung Ø " + sgn(dsum / dn) + " kcal/Tag in den letzten " + dn + " Tagen (Schwelle ±" + T.driftKcal + "), kostet " + (dsum > 0 ? "" : "spart ") + cut(dsum) + " Cuttage");
+      var dn = 0, dsum = 0, en = 0, esum = 0, dcut = addDays(x.d, -(T.driftTage - 1));
+      c.ds.forEach(function (d) { if (d.d >= dcut && d.abw != null) { dn++; dsum += d.abw; if (Math.abs(d.abw) > P.evAb) { en++; esum += d.abw; } } });
+      if (dn >= 7 && Math.abs(dsum / dn) > T.driftKcal) {
+        /* Ursache trennen: Großtage (über ±evAb, Feste) gegen den normalen Rest. Nur der Rest ist eine Aufgabe, die Großtage sind bezahlt (Cuttage). */
+        var rn = dn - en, rsum = dsum - esum, rM = rn ? rsum / rn : 0, nurGross = en > 0 && rn >= 3 && Math.abs(rM) <= T.driftKcal;
+        h += row("Drift Warnung", '<span class="' + (nurGross ? "s-warn" : "s-rot") + '">● ' + (dsum > 0 ? "über Ziel" : "unter Ziel") + "</span>", "", "",
+          "Abweichung Ø " + sgn(dsum / dn) + " kcal/Tag in den letzten " + dn + " Tagen (Schwelle ±" + T.driftKcal + "), kostet " + (dsum > 0 ? "" : "spart ") + cut(dsum) + " Cuttage" +
+          (en ? ". Davon " + en + (en === 1 ? " Tag" : " Tage") + " über ±" + P.evAb + ": " + sgn(esum) + " kcal, die übrigen " + rn + " Tage: " + sgn(rsum) + " kcal (Ø " + sgn(rM) + ")" : ""));
+        if (nurGross) h += row("Handlung", '<span class="s-gruen">keine</span>', "", "", "Die Drift kommt nur von den Großtagen, der Rest läuft sauber. Die Kosten stehen schon in der Cut Rechnung.");
+        else if (rM > T.driftKcal) h += row("Handlung", '<span class="s-rot">Ziel treffen</span>', "", "", (en ? "Auch ohne Großtage" : "Keine Großtage dabei, trotzdem") + " Ø " + sgn(rM) + " kcal/Tag über dem Ziel: Tage in Yazio genauer auf das Ziel verplanen. Die Stufe ist nicht das Thema.");
+        else if (rM < -T.driftKcal) h += row("Handlung", '<span class="s-warn">mehr essen</span>', "", "", (en ? "Auch ohne Großtage" : "Keine Großtage dabei, trotzdem") + " Ø " + sgn(rM) + " kcal/Tag unter dem Ziel: das Ziel erreichen, sonst bleibt der Aufbau aus.");
+        else h += row("Handlung", '<span class="s-warn">beobachten</span>', "", "", "Noch zu wenige Tage ohne Großtage für eine klare Aussage.");
+      }
     }
     if (aufbau) {
       var end = x.d, start = addDays(c.first.d, T.anlauf), s28 = addDays(end, -(T.fenster - 1)); if (s28 > start) start = s28;
       var len = diffDays(start, end) + 1;
       if (len < 14) {
-        h += row("Kurs", '<span class="s-warn">zu früh</span>', "", "", len < 1 ? "Anlauf läuft bis " + dm(addDays(c.first.d, T.anlauf - 1)) + ", Trend startet am " + dm(start) : "Trend startet nach dem Anlauf, vorläufig ab " + dm(addDays(start, 13)) + " (14 Tage)");
+        h += row("Waage gegen Rechnung", '<span class="s-warn">zu früh</span>', "", "", len < 1 ? "Anlauf läuft bis " + dm(addDays(c.first.d, T.anlauf - 1)) + ", Trend startet am " + dm(start) : "Trend startet nach dem Anlauf, vorläufig ab " + dm(addDays(start, 13)) + " (14 Tage)");
       } else {
         var tr = trend(start, end), n = 0, ss = 0, st2 = 0, sa = 0, se = 0;
         c.ds.forEach(function (d) { if (d.d < start || d.d > end || d.saldo == null || d.abw == null) return; n++; ss += d.saldo; st2 += d.stufe || 0; sa += d.abw; if (Math.abs(d.abw) > P.evAb) se += d.abw; });
         if (tr && n >= 10) {
           var sm = ss / n, real = sm - T.luecke, exp = (real - T.mkcal) * 7 / T.kcalkg + T.mkg, diff = tr.slope - exp;
           var sdE = T.sd * (len >= 28 ? 1 : len >= 21 ? 1.3 : 1.9), prelim = len < T.ampelMin, a = Math.abs(diff), amp = a <= sdE ? "gruen" : a <= 2 * sdE ? "warn" : "rot";
-          var label = amp === "gruen" ? "● Auf Kurs" : amp === "warn" ? "● Leichte Abweichung" : "● Nicht auf Kurs";
+          var label = amp === "gruen" ? "● passt" : amp === "warn" ? "● weicht etwas ab" : "● weicht stark ab";
           function kgw(v) { return (v < 0 ? MINUS : "+") + f2(Math.abs(v)); }
-          h += row("Kurs", prelim ? '<span class="s-warn">vorläufig</span>' : '<span class="s-' + amp + '">' + label + "</span>", "", "", prelim ? "Ampel ab " + dm(addDays(start, T.ampelMin - 1)) + " (" + T.ampelMin + " Tage), bisher " + len + " Tage" : len + " Tage (" + dm(start) + " bis " + dm(end) + ")");
+          {
+            var rt = regel(tr.slope, "regulaer"), tl = rt === "senken" ? ["s-rot", "● über Zielbereich"] : rt === "erhoehen" ? ["s-warn", "● unter Zielbereich"] : ["s-gruen", "● im Zielbereich"];
+            h += row("Tempo", '<span class="' + tl[0] + '">' + tl[1] + "</span>", "", "", "Waage " + kgw(tr.slope) + " kg/Woche. Zielbereich +" + f2(T.erhoehen) + " bis +" + f2(T.senken) + ": darüber senkt der Check die Stufe, darunter erhöht er" +
+              (len < T.fenster ? " (vorläufig nach " + len + " Tagen)" : "") + (next && next.art === "zwischen" ? ". Der Zwischencheck " + dm(next.d) + " reagiert erst ab +" + f2(T.zwSenken) : ""));
+          }
+          h += row("Waage gegen Rechnung", prelim ? '<span class="s-warn">vorläufig</span>' : '<span class="s-' + amp + '">' + label + "</span>", "", "", prelim ? "Ampel ab " + dm(addDays(start, T.ampelMin - 1)) + " (" + T.ampelMin + " Tage), bisher " + len + " Tage" : len + " Tage (" + dm(start) + " bis " + dm(end) + "), prüft die Kalorienrechnung, nicht das Tempo");
           h += row("Waage", kgw(tr.slope), "kg/Woche", "", "Regression, " + tr.n + " Wiegungen");
           h += row("Kalorien erwarten", kgw(exp), "kg/Woche", "", "Saldo " + sgn(sm) + " minus Watch Lücke " + T.luecke + ", Muskel " + f2(T.mkg) + " kg/Woche");
           h += row("Differenz", kgw(diff), "kg/Woche", "calc", "≈ " + sgn(diff * T.kcalkg / 7) + " kcal pro Tag, Ampel grün bis ±" + f2(sdE) + ", gelb bis ±" + f2(2 * sdE));
@@ -668,7 +683,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
               ? "Die Waage steigt schneller, als die Kalorien erklären. Prüfen: Yazio an Festen und Restaurant Tagen zu knapp, Watch Lücke größer als " + T.luecke + " kcal, Stufe zu hoch."
               : "Die Waage steigt langsamer, als die Kalorien erklären. Prüfen: Yazio übererfasst, Watch zeigt zu viel Verbrauch, Muskelaufbau unter dem Deckel.") + "</div>";
           }
-        } else h += row("Kurs", '<span class="s-warn">zu wenig Daten</span>', "", "", "mindestens 8 Wiegungen und 10 Tage mit Ziel im Fenster");
+        } else h += row("Waage gegen Rechnung", '<span class="s-warn">zu wenig Daten</span>', "", "", "mindestens 8 Wiegungen und 10 Tage mit Ziel im Fenster");
       }
     }
     return h + "</div>";
