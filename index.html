@@ -197,10 +197,24 @@ html.standalone .hero { top: 44px; }
 .tile { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 84px; padding: 8px 14px; border: 1.5px solid transparent; border-radius: 14px; }
 .tile.rest { border-top: 0; }
 .tile .tl { font-size: 0.78rem; font-weight: 700; opacity: 0.85; }
+.hin2 > *, .tiles > * { min-width: 0; }
 .tile .tv { display: flex; align-items: baseline; gap: 6px; }
 .tile .num { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
 .tile.total .unit { color: color-mix(in srgb, var(--total-ink) 72%, transparent); }
 .tile.rest .unit { color: inherit; opacity: 0.8; }
+@media (max-width: 340px) { .tile, .hcard { padding-left: 10px; padding-right: 10px; } .tile .num { font-size: 1.6rem; } .hcard input { font-size: 1.9rem; } .hcard.ist input { font-size: 1.4rem; } }
+/* Training 1 bis 3: oben klein die Nummer, darunter die Auswahl des Trainingstyps (setzt den Standardwert, der Wert bleibt änderbar) */
+.trow .tlab { display: flex; flex-direction: column; min-width: 0; flex: 1; padding: 2px 0; }
+.trow .tn { font-size: 0.7rem; font-weight: 600; color: var(--muted); line-height: 1.15; }
+.tsw { position: relative; display: inline-block; max-width: 100%; align-self: flex-start; }
+.tsw::after { content: "▾"; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: var(--input-ink); pointer-events: none; }
+.tsel {
+  -webkit-appearance: none; appearance: none; max-width: 100%; min-height: 28px; padding: 2px 22px 2px 0; margin: 0;
+  background: transparent; border: 0; border-radius: 8px; color: var(--ink); font: 700 1.02rem var(--font);
+  text-overflow: ellipsis; touch-action: manipulation; cursor: pointer;
+}
+.tsel.none { color: var(--muted); font-weight: 600; }
+.tsel:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .row.input.off .value input { opacity: 0.35; }
 .row.input.off .label { color: var(--muted); }
 .mode { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; background: var(--line); color: var(--ink); vertical-align: 2px; }
@@ -240,7 +254,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.8.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.9.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -270,16 +284,16 @@ html.standalone .hero { top: 44px; }
       <span class="label">Ruheenergie</span>
       <span class="value"><input id="ruhe" data-key="ruhe" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
-    <label class="row input" for="t1">
-      <span class="label">Training 1</span>
+    <label class="row input trow" for="t1">
+      <span class="tlab"><span class="tn">Training 1</span><span class="tsw"><select class="tsel" data-tkey="a1" aria-label="Trainingstyp für Training 1"></select></span></span>
       <span class="value"><input id="t1" data-key="t1" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
-    <label class="row input" for="t2">
-      <span class="label">Training 2</span>
+    <label class="row input trow" for="t2">
+      <span class="tlab"><span class="tn">Training 2</span><span class="tsw"><select class="tsel" data-tkey="a2" aria-label="Trainingstyp für Training 2"></select></span></span>
       <span class="value"><input id="t2" data-key="t2" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
-    <label class="row input" for="t3">
-      <span class="label">Training 3</span>
+    <label class="row input trow" for="t3">
+      <span class="tlab"><span class="tn">Training 3</span><span class="tsw"><select class="tsel" data-tkey="a3" aria-label="Trainingstyp für Training 3"></select></span></span>
       <span class="value"><input id="t3" data-key="t3" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
     <label class="row input" for="alltag" id="alltag-row">
@@ -347,15 +361,30 @@ html.standalone .hero { top: 44px; }
      Training 1 = Kraft Workout. Spaziergänge sind nicht eingerechnet und bleiben optional. Mo, Mi, Fr Studio; Di, Do Heimgym; Sa, So frei. */
   var DEFAULTS = { ruhe: 2050, t1: 0, t2: 0, t3: 0, alltag: 280, surplus: 150, essen: 0, ist: 0 };   /* ist = Aktivität gesamt, gemessen (Yazio Verbrannt); 0 = leer, es gilt der Plan */
   var DAY_T1 = [230, 160, 230, 160, 230, 0, 0];
+  /* Trainingstypen und ihr Standardwert in kcal: Wert, der seit 29.06.2026 bei 95 % der Einheiten nicht unterschritten wurde (Apple Watch, Auswertung 11.11.2026):
+     Gym (Studio) 232, Homegym 164; Spaziergänge in zwei Gruppen (Grenze 240 kcal, dazwischen gibt es kaum Werte): klein 90 (n 113, Median 184), groß 261 (n 43, Median 294).
+     "Anderes" lässt den Wert stehen. */
+  var TYPES = [["", "Kein Training", 0], ["gym", "Gym", 230], ["home", "Homegym", 160], ["klein", "Kleiner Spaziergang", 90], ["gross", "Großer Spaziergang", 260], ["frei", "Anderes", null]];
+  var TYPE_MAP = {}; TYPES.forEach(function (t) { TYPE_MAP[t[0]] = t; });
+  var TKEYS = ["a1", "a2", "a3"];   /* Typ von Training 1 bis 3 */
+  /* Training 1 vorausgewählt: Mo, Mi, Fr Gym, Di, Do Homegym, Sa und So kein Training; Training 2 und 3 sind optional */
+  function defType(n, slot) { return n === 1 && slot >= 0 && slot <= 4 ? (slot % 2 === 0 ? "gym" : "home") : ""; }
+  /* Daten aus der Zeit vor den Typen: Typ aus dem Wert ableiten */
+  function inferType(n, kcal) {
+    if (!kcal) return "";
+    if (n === 1) return kcal === 230 ? "gym" : kcal === 160 ? "home" : "frei";
+    return kcal === 160 ? "klein" : kcal === 280 ? "gross" : "frei";
+  }
   var DAY_ALLTAG = [420, 310, 420, 310, 420, 280, 280];
   function defOf(k, slot) {
     var s = slot >= 0 && slot <= 6 ? slot : 0;
     if (k === "surplus") return s >= 5 ? 0 : DEFAULTS.surplus;
     if (k === "t1") return DAY_T1[s];
+    if (k === "a1" || k === "a2" || k === "a3") return defType(Number(k.charAt(1)), s);
     if (k === "alltag") return DAY_ALLTAG[s];
     return DEFAULTS[k];
   }
-  var RESET_KEYS = ["t1", "t2", "t3", "alltag", "essen", "ist"];
+  var RESET_KEYS = ["t1", "t2", "t3", "a1", "a2", "a3", "alltag", "essen", "ist"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
   var DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];   /* kurz, damit die Kopfzeile bei keinem Wochentag umbricht */
@@ -371,6 +400,10 @@ html.standalone .hero { top: 44px; }
     KEYS.forEach(function (k) {
       var def = defOf(k, slot);
       out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : def;
+    });
+    TKEYS.forEach(function (k, i) {
+      var v = obj && typeof obj[k] === "string" && TYPE_MAP.hasOwnProperty(obj[k]) ? obj[k] : null;
+      out[k] = v !== null ? v : (obj ? inferType(i + 1, out["t" + (i + 1)]) : defOf(k, slot));
     });
     return out;
   }
@@ -472,6 +505,7 @@ html.standalone .hero { top: 44px; }
 
   function update() {
     renderNote();
+    TKEYS.forEach(function (k) { sels[k].classList.toggle("none", cur()[k] === ""); });
     var r = calc(cur());
     document.getElementById("out-aktivitaet").textContent = fmt(r.aktivitaet);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
@@ -488,8 +522,20 @@ html.standalone .hero { top: 44px; }
     document.getElementById("out-derived").textContent = fmtSigned(r.alltagIst);
     document.getElementById("derived-note").textContent = r.alltagIst < 0 ? "Trainings noch nicht komplett gelaufen" : "Ist minus Trainings";
   }
+  var sels = {};
+  document.querySelectorAll("select[data-tkey]").forEach(function (el) {
+    sels[el.dataset.tkey] = el;
+    TYPES.forEach(function (t) { var o = document.createElement("option"); o.value = t[0]; o.textContent = t[1]; el.appendChild(o); });
+    el.addEventListener("change", function () {
+      var k = el.dataset.tkey, n = k.charAt(1), t = TYPE_MAP[el.value];
+      cur()[k] = el.value;
+      if (t && t[2] !== null) { cur()["t" + n] = t[2]; inputs["t" + n].value = t[2]; }   /* Typ setzt den Standardwert, "Anderes" lässt ihn stehen */
+      changed(); update();
+    });
+  });
   function writeInputs() {
     var s = cur();
+    TKEYS.forEach(function (k) { sels[k].value = s[k]; });
     KEYS.forEach(function (k) { inputs[k].value = (k === "ist" && !s[k]) ? "" : s[k]; });
   }
   function renderSlots() {
