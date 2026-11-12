@@ -209,6 +209,7 @@ html.standalone .hero { top: 44px; }
 /* Training 1 bis 3: oben klein die Nummer, darunter die Auswahl des Trainingstyps (setzt den Standardwert, der Wert bleibt änderbar) */
 .trow .tlab { display: flex; flex-direction: column; min-width: 0; flex: 1; padding: 0; }
 .trow .tn { font-size: 0.7rem; font-weight: 600; color: var(--muted); line-height: 1.15; }
+.tdev { margin-left: 6px; font-weight: 700; }   /* Plan und Abweichung, wenn der Wert vom Standard des Typs abweicht */
 .tsw { position: relative; display: inline-block; max-width: 100%; align-self: flex-start; }
 .tsw::after { content: "▾"; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: var(--input-ink); pointer-events: none; }
 .tsel {
@@ -259,7 +260,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.11.2<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.12.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -290,15 +291,15 @@ html.standalone .hero { top: 44px; }
 
   <section class="sheet" aria-label="Eingaben und Ergebnis">
     <label class="row input trow" for="t1">
-      <span class="tlab"><span class="tn">Training 1</span><span class="tsw"><select class="tsel" data-tkey="a1" aria-label="Trainingstyp für Training 1"></select></span></span>
+      <span class="tlab"><span class="tn">Training 1<span class="tdev" id="tdev1"></span></span><span class="tsw"><select class="tsel" data-tkey="a1" aria-label="Trainingstyp für Training 1"></select></span></span>
       <span class="value"><input id="t1" data-key="t1" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
     <label class="row input trow" for="t2">
-      <span class="tlab"><span class="tn">Training 2</span><span class="tsw"><select class="tsel" data-tkey="a2" aria-label="Trainingstyp für Training 2"></select></span></span>
+      <span class="tlab"><span class="tn">Training 2<span class="tdev" id="tdev2"></span></span><span class="tsw"><select class="tsel" data-tkey="a2" aria-label="Trainingstyp für Training 2"></select></span></span>
       <span class="value"><input id="t2" data-key="t2" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
     <label class="row input trow" for="t3">
-      <span class="tlab"><span class="tn">Training 3</span><span class="tsw"><select class="tsel" data-tkey="a3" aria-label="Trainingstyp für Training 3"></select></span></span>
+      <span class="tlab"><span class="tn">Training 3<span class="tdev" id="tdev3"></span></span><span class="tsw"><select class="tsel" data-tkey="a3" aria-label="Trainingstyp für Training 3"></select></span></span>
       <span class="value"><input id="t3" data-key="t3" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off"><span class="unit">kcal</span></span>
     </label>
     <label class="row input" for="alltag" id="alltag-row">
@@ -399,14 +400,10 @@ html.standalone .hero { top: 44px; }
     if (k === "t1") return DAY_T1[s];
     if (k === "a1" || k === "a2" || k === "a3") return defType(Number(k.charAt(1)), s);
     if (k === "alltag") return DAY_ALLTAG[s];
-    if (k === "pt1" || k === "pt2" || k === "pt3" || k === "pal") return -1;
     return DEFAULTS[k];
   }
   /* ruhe: leer = Standard 2050, ein eingetragener Wert überschreibt ihn; in Neon steht immer der wirksame Wert, nie 0 */
-  /* Plan Stand: sobald Aktivität Ist eingetragen wird, werden Training 1 bis 3 und Alltag als Plan festgehalten (pt1 bis pt3, pal; -1 = kein Stand).
-     Danach dürfen die Trainings auf die gemessenen Werte gesetzt werden, die Zeile Aktivität Plan rechnet weiter mit dem festgehaltenen Plan. */
-  var SKEYS = ["pt1", "pt2", "pt3", "pal"];
-  var RESET_KEYS = ["t1", "t2", "t3", "a1", "a2", "a3", "alltag", "essen", "ist", "ruhe", "pt1", "pt2", "pt3", "pal"];
+  var RESET_KEYS = ["t1", "t2", "t3", "a1", "a2", "a3", "alltag", "essen", "ist", "ruhe"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
   var DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];   /* kurz, damit die Kopfzeile bei keinem Wochentag umbricht */
@@ -423,7 +420,6 @@ html.standalone .hero { top: 44px; }
       var def = defOf(k, slot);
       out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : def;
     });
-    SKEYS.forEach(function (k) { out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : -1; });
     TKEYS.forEach(function (k, i) {
       var v = obj && typeof obj[k] === "string" && TYPE_MAP.hasOwnProperty(obj[k]) ? obj[k] : null;
       out[k] = v !== null ? v : (obj ? inferType(i + 1, out["t" + (i + 1)]) : defOf(k, slot));
@@ -495,15 +491,17 @@ html.standalone .hero { top: 44px; }
 
   /* Plan: Training 1 bis 3 plus Alltag. Ist (gemessene Aktivität gesamt) enthält die Trainings schon und ersetzt beide; der Alltag ergibt sich dann als Ist minus Trainings. */
   function calc(s) {
-    var tr = s.t1 + s.t2 + s.t3, ist = s.ist > 0, snap = s.pt1 >= 0 && ist;
-    var planAlltag = snap ? s.pal : s.alltag, planTr = snap ? s.pt1 + s.pt2 + s.pt3 : tr;
+    var tr = s.t1 + s.t2 + s.t3, ist = s.ist > 0, planTr = 0;
+    /* Plan der Trainings: Standardwert des gewählten Typs (bei "Anderes" der eingetragene Wert); überschriebene Trainings ändern den Plan nicht */
+    [1, 2, 3].forEach(function (n) { var t = TYPE_MAP[s["a" + n]], d = (t && t[2] !== null) ? t[2] : s["t" + n]; planTr += d; });
     var aktivitaet = ist ? s.ist : tr + s.alltag;
     var zwischen = s.ruhe + aktivitaet;
     var gesamt = zwischen + s.surplus;
     var rest = gesamt - s.essen;
-    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr, planAkt: planTr + planAlltag, planAlltag: planAlltag, ruheIst: s.ruhe !== DEFAULTS.ruhe };
+    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr, planAkt: planTr + s.alltag, planAlltag: s.alltag, ruheIst: s.ruhe !== DEFAULTS.ruhe, gerechnet: tr + s.alltag };
   }
   function fmt(n) { return nf.format(Math.round(n)); }
+  function dlt(n) { return (Math.round(n) > 0 ? "+" : "") + (Math.round(n) < 0 ? "−" : "") + nf.format(Math.abs(Math.round(n))); }
   function fmtSigned(n) {
     var r = Math.round(n);
     return (r < 0 ? "−" : "") + nf.format(Math.abs(r));
@@ -541,10 +539,13 @@ html.standalone .hero { top: 44px; }
     document.getElementById("out-ruhe-ist").textContent = fmt(cs.ruhe);
     document.getElementById("ruhe-ist-row").hidden = !r.ruheIst;
     document.getElementById("ruhe-plan-row").classList.toggle("off", r.ruheIst);
-    function dlt(n) { return (Math.round(n) > 0 ? "+" : "") + fmtSigned(n); }
     document.getElementById("akt-note").textContent = dlt(cs.ist - r.planAkt) + " gegen Plan";
     document.getElementById("ruhe-note").textContent = dlt(cs.ruhe - DEFAULTS.ruhe) + " gegen Plan";
-    inputs.ist.placeholder = fmt(r.planAkt);
+    [1, 2, 3].forEach(function (n) {
+      var t = TYPE_MAP[cs["a" + n]], d = (t && t[2] !== null) ? t[2] : null, v = cs["t" + n];
+      document.getElementById("tdev" + n).textContent = (d !== null && v !== d) ? " Plan " + fmt(d) + " (" + dlt(v - d) + ")" : "";
+    });
+    inputs.ist.placeholder = fmt(r.gerechnet);   /* grau = was ohne Ist gerechnet wird (Trainings plus Alltag) */
     inputs.ruhe.placeholder = fmt(DEFAULTS.ruhe);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
     document.getElementById("out-gesamt").textContent = fmt(r.gesamt);
@@ -567,7 +568,6 @@ html.standalone .hero { top: 44px; }
     el.addEventListener("change", function () {
       var k = el.dataset.tkey, n = k.charAt(1), t = TYPE_MAP[el.value];
       cur()[k] = el.value;
-      if (!(cur().ist > 0)) { cur().pt1 = -1; cur().pt2 = -1; cur().pt3 = -1; cur().pal = -1; }
       if (t && t[2] !== null) { cur()["t" + n] = t[2]; inputs["t" + n].value = t[2]; }   /* Typ setzt den Standardwert, "Anderes" lässt ihn stehen */
       changed(); update();
     });
@@ -590,17 +590,7 @@ html.standalone .hero { top: 44px; }
     inputs[el.dataset.key] = el;
     el.addEventListener("input", function () {
       var v = parseFloat(String(el.value).replace(",", "."));
-      var prevVal = cur()[el.dataset.key];
       cur()[el.dataset.key] = isFinite(v) ? v : 0;
-      if (el.dataset.key === "ist") {
-        var c = cur();
-        /* Plan Stand festhalten, solange noch keiner da ist. Wird das Feld zum Neutippen kurz leer, bleibt der Stand erhalten. */
-        if (!(prevVal > 0) && c.ist > 0 && c.pt1 < 0) { c.pt1 = c.t1; c.pt2 = c.t2; c.pt3 = c.t3; c.pal = c.alltag; }
-      }
-      /* Training oder Alltag bei leerem Ist ändern ist Planen: alter Plan Stand verfällt */
-      if ((el.dataset.key === "t1" || el.dataset.key === "t2" || el.dataset.key === "t3" || el.dataset.key === "alltag") && !(cur().ist > 0)) {
-        var c2 = cur(); c2.pt1 = -1; c2.pt2 = -1; c2.pt3 = -1; c2.pal = -1;
-      }
       if (el.dataset.key === "ruhe" && !(v > 0)) cur().ruhe = DEFAULTS.ruhe;   /* leer = Standard */
       changed();
       update();
