@@ -223,6 +223,8 @@ html.standalone .hero { top: 44px; }
 .mode { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; background: var(--line); color: var(--ink); vertical-align: 2px; }
 .mode.ist { background: var(--total-bg); color: var(--total-ink); }
 .row.derived { font-weight: 600; }
+.row.calc[hidden] { display: none; }
+.row.calc.off { opacity: 0.5; }   /* Plan Zeile, solange ein Ist Wert eingetragen ist und zählt */
 .row.derived[hidden] { display: none; }
 .row small { display: block; font-size: 0.7rem; font-weight: 500; color: var(--muted); line-height: 1.2; }
 
@@ -257,7 +259,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.10.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.11.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -281,7 +283,7 @@ html.standalone .hero { top: 44px; }
       </label>
       <label class="hcard ist" id="ist-card" for="ist">
         <span class="hl">Aktivität Ist</span>
-        <span class="hv"><input id="ist" data-key="ist" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off" placeholder="Plan"><span class="unit">kcal</span></span>
+        <span class="hv"><input id="ist" data-key="ist" type="number" inputmode="numeric" enterkeyhint="done" step="1" min="0" autocomplete="off" placeholder=""><span class="unit">kcal</span></span>
       </label>
     </div>
   </section>
@@ -308,9 +310,21 @@ html.standalone .hero { top: 44px; }
       <span class="label">Alltag errechnet<small id="derived-note">Ist minus Trainings</small></span>
       <span class="value"><span class="num" id="out-derived">0</span><span class="unit">kcal</span></span>
     </div>
-    <div class="row calc">
-      <span class="label">Aktivität <span class="mode" id="mode-badge">Plan</span></span>
-      <span class="value"><span class="num" id="out-aktivitaet">0</span><span class="unit">kcal</span></span>
+    <div class="row calc" id="ruhe-plan-row">
+      <span class="label">Ruhe <span class="mode">Plan</span></span>
+      <span class="value"><span class="num" id="out-ruhe-plan">0</span><span class="unit">kcal</span></span>
+    </div>
+    <div class="row calc" id="ruhe-ist-row" hidden>
+      <span class="label">Ruhe <span class="mode ist">Ist</span></span>
+      <span class="value"><span class="num" id="out-ruhe-ist">0</span><span class="unit">kcal</span></span>
+    </div>
+    <div class="row calc" id="akt-plan-row">
+      <span class="label">Aktivität <span class="mode">Plan</span></span>
+      <span class="value"><span class="num" id="out-akt-plan">0</span><span class="unit">kcal</span></span>
+    </div>
+    <div class="row calc" id="akt-ist-row" hidden>
+      <span class="label">Aktivität <span class="mode ist">Ist</span></span>
+      <span class="value"><span class="num" id="out-akt-ist">0</span><span class="unit">kcal</span></span>
     </div>
     <div class="row calc">
       <span class="label">Zwischenstand</span>
@@ -481,7 +495,7 @@ html.standalone .hero { top: 44px; }
     var zwischen = s.ruhe + aktivitaet;
     var gesamt = zwischen + s.surplus;
     var rest = gesamt - s.essen;
-    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr };
+    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr, planAkt: tr + s.alltag, ruheIst: s.ruhe !== DEFAULTS.ruhe };
   }
   function fmt(n) { return nf.format(Math.round(n)); }
   function fmtSigned(n) {
@@ -511,7 +525,18 @@ html.standalone .hero { top: 44px; }
     renderNote();
     TKEYS.forEach(function (k) { sels[k].classList.toggle("none", cur()[k] === ""); });
     var r = calc(cur());
-    document.getElementById("out-aktivitaet").textContent = fmt(r.aktivitaet);
+    var cs = cur();
+    /* Plan bleibt immer sichtbar; ein eingetragener Ist Wert erscheint als zweite Zeile und zählt, die Plan Zeile wird blasser. In den Karten oben steht der Plan grau (Platzhalter), er zählt nicht als Ist. */
+    document.getElementById("out-akt-plan").textContent = fmt(r.planAkt);
+    document.getElementById("out-akt-ist").textContent = fmt(cs.ist);
+    document.getElementById("akt-ist-row").hidden = !r.ist;
+    document.getElementById("akt-plan-row").classList.toggle("off", r.ist);
+    document.getElementById("out-ruhe-plan").textContent = fmt(DEFAULTS.ruhe);
+    document.getElementById("out-ruhe-ist").textContent = fmt(cs.ruhe);
+    document.getElementById("ruhe-ist-row").hidden = !r.ruheIst;
+    document.getElementById("ruhe-plan-row").classList.toggle("off", r.ruheIst);
+    inputs.ist.placeholder = fmt(r.planAkt);
+    inputs.ruhe.placeholder = fmt(DEFAULTS.ruhe);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
     document.getElementById("out-gesamt").textContent = fmt(r.gesamt);
     document.getElementById("out-rest").textContent = fmtSigned(r.rest);
@@ -522,7 +547,6 @@ html.standalone .hero { top: 44px; }
     document.getElementById("ist-card").classList.toggle("on", r.ist);
     document.getElementById("ruhe-card").classList.toggle("on", cur().ruhe !== DEFAULTS.ruhe);
     document.getElementById("alltag-row").classList.toggle("off", r.ist);
-    var mb = document.getElementById("mode-badge"); mb.textContent = r.ist ? "Ist" : "Plan"; mb.classList.toggle("ist", r.ist);
     var dr = document.getElementById("derived-row"); dr.hidden = !r.ist;
     document.getElementById("out-derived").textContent = fmtSigned(r.alltagIst);
     document.getElementById("derived-note").textContent = r.alltagIst < 0 ? "Trainings noch nicht komplett gelaufen" : "Ist minus Trainings";
