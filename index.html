@@ -260,7 +260,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.12.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.12.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -330,6 +330,10 @@ html.standalone .hero { top: 44px; }
     <div class="row calc">
       <span class="label">Zwischenstand</span>
       <span class="value"><span class="num" id="out-zwischen">0</span><span class="unit">kcal</span></span>
+    </div>
+    <div class="row calc dev" id="dev-row" hidden>
+      <span class="label">Abweichung vom Plan<small>Verbrauch gesamt gegen Plan</small></span>
+      <span class="value"><span class="num" id="out-dev">0</span><span class="unit">kcal</span></span>
     </div>
 
     <label class="row input" for="surplus">
@@ -539,6 +543,9 @@ html.standalone .hero { top: 44px; }
     document.getElementById("out-ruhe-ist").textContent = fmt(cs.ruhe);
     document.getElementById("ruhe-ist-row").hidden = !r.ruheIst;
     document.getElementById("ruhe-plan-row").classList.toggle("off", r.ruheIst);
+    var devT = r.zwischen - (DEFAULTS.ruhe + r.planAkt);   /* Ruhe und Aktivität, wie gerechnet, gegen Ruhe Standard plus Plan Aktivität */
+    document.getElementById("out-dev").textContent = dlt(devT);
+    document.getElementById("dev-row").hidden = Math.round(devT) === 0;
     document.getElementById("akt-note").textContent = dlt(cs.ist - r.planAkt) + " gegen Plan";
     document.getElementById("ruhe-note").textContent = dlt(cs.ruhe - DEFAULTS.ruhe) + " gegen Plan";
     [1, 2, 3].forEach(function (n) {
