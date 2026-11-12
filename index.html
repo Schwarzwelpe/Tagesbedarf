@@ -259,7 +259,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.11.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.11.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -315,7 +315,7 @@ html.standalone .hero { top: 44px; }
       <span class="value"><span class="num" id="out-ruhe-plan">0</span><span class="unit">kcal</span></span>
     </div>
     <div class="row calc" id="ruhe-ist-row" hidden>
-      <span class="label">Ruhe <span class="mode ist">Ist</span></span>
+      <span class="label">Ruhe <span class="mode ist">Ist</span><small id="ruhe-note"></small></span>
       <span class="value"><span class="num" id="out-ruhe-ist">0</span><span class="unit">kcal</span></span>
     </div>
     <div class="row calc" id="akt-plan-row">
@@ -323,7 +323,7 @@ html.standalone .hero { top: 44px; }
       <span class="value"><span class="num" id="out-akt-plan">0</span><span class="unit">kcal</span></span>
     </div>
     <div class="row calc" id="akt-ist-row" hidden>
-      <span class="label">Aktivität <span class="mode ist">Ist</span></span>
+      <span class="label">Aktivität <span class="mode ist">Ist</span><small id="akt-note"></small></span>
       <span class="value"><span class="num" id="out-akt-ist">0</span><span class="unit">kcal</span></span>
     </div>
     <div class="row calc">
@@ -399,10 +399,14 @@ html.standalone .hero { top: 44px; }
     if (k === "t1") return DAY_T1[s];
     if (k === "a1" || k === "a2" || k === "a3") return defType(Number(k.charAt(1)), s);
     if (k === "alltag") return DAY_ALLTAG[s];
+    if (k === "pt1" || k === "pt2" || k === "pt3" || k === "pal") return -1;
     return DEFAULTS[k];
   }
   /* ruhe: leer = Standard 2050, ein eingetragener Wert überschreibt ihn; in Neon steht immer der wirksame Wert, nie 0 */
-  var RESET_KEYS = ["t1", "t2", "t3", "a1", "a2", "a3", "alltag", "essen", "ist", "ruhe"];
+  /* Plan Stand: sobald Aktivität Ist eingetragen wird, werden Training 1 bis 3 und Alltag als Plan festgehalten (pt1 bis pt3, pal; -1 = kein Stand).
+     Danach dürfen die Trainings auf die gemessenen Werte gesetzt werden, die Zeile Aktivität Plan rechnet weiter mit dem festgehaltenen Plan. */
+  var SKEYS = ["pt1", "pt2", "pt3", "pal"];
+  var RESET_KEYS = ["t1", "t2", "t3", "a1", "a2", "a3", "alltag", "essen", "ist", "ruhe", "pt1", "pt2", "pt3", "pal"];
   var KEYS = Object.keys(DEFAULTS);
   var SLOT_COUNT = 7;   /* 0 = Montag bis 6 = Sonntag */
   var DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];   /* kurz, damit die Kopfzeile bei keinem Wochentag umbricht */
@@ -419,6 +423,7 @@ html.standalone .hero { top: 44px; }
       var def = defOf(k, slot);
       out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : def;
     });
+    SKEYS.forEach(function (k) { out[k] = (obj && typeof obj[k] === "number" && isFinite(obj[k])) ? obj[k] : -1; });
     TKEYS.forEach(function (k, i) {
       var v = obj && typeof obj[k] === "string" && TYPE_MAP.hasOwnProperty(obj[k]) ? obj[k] : null;
       out[k] = v !== null ? v : (obj ? inferType(i + 1, out["t" + (i + 1)]) : defOf(k, slot));
@@ -490,12 +495,13 @@ html.standalone .hero { top: 44px; }
 
   /* Plan: Training 1 bis 3 plus Alltag. Ist (gemessene Aktivität gesamt) enthält die Trainings schon und ersetzt beide; der Alltag ergibt sich dann als Ist minus Trainings. */
   function calc(s) {
-    var tr = s.t1 + s.t2 + s.t3, ist = s.ist > 0;
+    var tr = s.t1 + s.t2 + s.t3, ist = s.ist > 0, snap = s.pt1 >= 0 && ist;
+    var planAlltag = snap ? s.pal : s.alltag, planTr = snap ? s.pt1 + s.pt2 + s.pt3 : tr;
     var aktivitaet = ist ? s.ist : tr + s.alltag;
     var zwischen = s.ruhe + aktivitaet;
     var gesamt = zwischen + s.surplus;
     var rest = gesamt - s.essen;
-    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr, planAkt: tr + s.alltag, ruheIst: s.ruhe !== DEFAULTS.ruhe };
+    return { aktivitaet: aktivitaet, zwischen: zwischen, gesamt: gesamt, rest: rest, ist: ist, alltagIst: s.ist - tr, planAkt: planTr + planAlltag, planAlltag: planAlltag, ruheIst: s.ruhe !== DEFAULTS.ruhe };
   }
   function fmt(n) { return nf.format(Math.round(n)); }
   function fmtSigned(n) {
@@ -535,6 +541,9 @@ html.standalone .hero { top: 44px; }
     document.getElementById("out-ruhe-ist").textContent = fmt(cs.ruhe);
     document.getElementById("ruhe-ist-row").hidden = !r.ruheIst;
     document.getElementById("ruhe-plan-row").classList.toggle("off", r.ruheIst);
+    function dlt(n) { return (Math.round(n) > 0 ? "+" : "") + fmtSigned(n); }
+    document.getElementById("akt-note").textContent = dlt(cs.ist - r.planAkt) + " gegen Plan";
+    document.getElementById("ruhe-note").textContent = dlt(cs.ruhe - DEFAULTS.ruhe) + " gegen Plan";
     inputs.ist.placeholder = fmt(r.planAkt);
     inputs.ruhe.placeholder = fmt(DEFAULTS.ruhe);
     document.getElementById("out-zwischen").textContent = fmt(r.zwischen);
@@ -549,7 +558,7 @@ html.standalone .hero { top: 44px; }
     document.getElementById("alltag-row").classList.toggle("off", r.ist);
     var dr = document.getElementById("derived-row"); dr.hidden = !r.ist;
     document.getElementById("out-derived").textContent = fmtSigned(r.alltagIst);
-    document.getElementById("derived-note").textContent = r.alltagIst < 0 ? "Trainings noch nicht komplett gelaufen" : "Ist minus Trainings";
+    document.getElementById("derived-note").textContent = r.alltagIst < 0 ? "Trainings noch nicht komplett gelaufen" : "Ist minus Trainings, Plan " + fmt(r.planAlltag) + " (" + dlt(r.alltagIst - r.planAlltag) + ")";
   }
   var sels = {};
   document.querySelectorAll("select[data-tkey]").forEach(function (el) {
@@ -580,7 +589,13 @@ html.standalone .hero { top: 44px; }
     inputs[el.dataset.key] = el;
     el.addEventListener("input", function () {
       var v = parseFloat(String(el.value).replace(",", "."));
+      var prevVal = cur()[el.dataset.key];
       cur()[el.dataset.key] = isFinite(v) ? v : 0;
+      if (el.dataset.key === "ist") {
+        var c = cur();
+        if (!(prevVal > 0) && c.ist > 0) { c.pt1 = c.t1; c.pt2 = c.t2; c.pt3 = c.t3; c.pal = c.alltag; }   /* Plan Stand festhalten */
+        if (!(c.ist > 0)) { c.pt1 = -1; c.pt2 = -1; c.pt3 = -1; c.pal = -1; }
+      }
       if (el.dataset.key === "ruhe" && !(v > 0)) cur().ruhe = DEFAULTS.ruhe;   /* leer = Standard */
       changed();
       update();
