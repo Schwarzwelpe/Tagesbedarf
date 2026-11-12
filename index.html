@@ -259,7 +259,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.11.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.11.2<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -567,6 +567,7 @@ html.standalone .hero { top: 44px; }
     el.addEventListener("change", function () {
       var k = el.dataset.tkey, n = k.charAt(1), t = TYPE_MAP[el.value];
       cur()[k] = el.value;
+      if (!(cur().ist > 0)) { cur().pt1 = -1; cur().pt2 = -1; cur().pt3 = -1; cur().pal = -1; }
       if (t && t[2] !== null) { cur()["t" + n] = t[2]; inputs["t" + n].value = t[2]; }   /* Typ setzt den Standardwert, "Anderes" lässt ihn stehen */
       changed(); update();
     });
@@ -593,8 +594,12 @@ html.standalone .hero { top: 44px; }
       cur()[el.dataset.key] = isFinite(v) ? v : 0;
       if (el.dataset.key === "ist") {
         var c = cur();
-        if (!(prevVal > 0) && c.ist > 0) { c.pt1 = c.t1; c.pt2 = c.t2; c.pt3 = c.t3; c.pal = c.alltag; }   /* Plan Stand festhalten */
-        if (!(c.ist > 0)) { c.pt1 = -1; c.pt2 = -1; c.pt3 = -1; c.pal = -1; }
+        /* Plan Stand festhalten, solange noch keiner da ist. Wird das Feld zum Neutippen kurz leer, bleibt der Stand erhalten. */
+        if (!(prevVal > 0) && c.ist > 0 && c.pt1 < 0) { c.pt1 = c.t1; c.pt2 = c.t2; c.pt3 = c.t3; c.pal = c.alltag; }
+      }
+      /* Training oder Alltag bei leerem Ist ändern ist Planen: alter Plan Stand verfällt */
+      if ((el.dataset.key === "t1" || el.dataset.key === "t2" || el.dataset.key === "t3" || el.dataset.key === "alltag") && !(cur().ist > 0)) {
+        var c2 = cur(); c2.pt1 = -1; c2.pt2 = -1; c2.pt3 = -1; c2.pal = -1;
       }
       if (el.dataset.key === "ruhe" && !(v > 0)) cur().ruhe = DEFAULTS.ruhe;   /* leer = Standard */
       changed();
