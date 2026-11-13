@@ -295,7 +295,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   <section id="v-phase" aria-label="Phase" hidden></section>
   <section id="v-gew" aria-label="Gewicht" hidden></section>
 
-  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.13.0</p>
+  <p class="foot"><button type="button" id="logout">Zugang zurücksetzen</button><br>v1.14.0</p>
 </main>
 
 <nav class="tabs" aria-label="Ansicht wählen">
@@ -326,8 +326,8 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
   var Q_EREIGNIS = "select datum::text as d, titel from v_ereignis order by datum";
   var CHK = [];                            /* feste Check Termine (v_check) */
   var Q_CHECK = "select datum::text as d, gruppe from v_check order by datum";
-  var T = { fenster: 28, anlauf: 14, luecke: 25, mkg: 0.08, mkcal: 30, kcalkg: 7000, sd: 0.14, senken: 0.30, erhoehen: 0.10, schritt: 50, ampelMin: 21, zwSenken: 0.50, zwErhoehen: -0.10, driftKcal: 100, driftTage: 14 };
-  var TKEY = { trend_fenster_tage: "fenster", anlauf_tage: "anlauf", watch_luecke_kcal: "luecke", muskel_kg_woche: "mkg", muskel_kcal_tag: "mkcal", kcal_pro_kg: "kcalkg", trend_streuung_kg_woche: "sd", trend_senken_ab: "senken", trend_erhoehen_bis: "erhoehen", stufe_schritt_kcal: "schritt", ampel_min_tage: "ampelMin", zw_senken_ab: "zwSenken", zw_erhoehen_bis: "zwErhoehen", drift_warn_kcal: "driftKcal", drift_warn_tage: "driftTage" };
+  var T = { fenster: 28, anlauf: 14, luecke: 25, mkg: 0.08, mkcal: 30, kcalkg: 7000, sd: 0.14, senken: 0.30, erhoehen: 0.10, schritt: 50, ampelMin: 21, zwSenken: 0.50, zwErhoehen: -0.10, driftKcal: 100, driftTage: 14, ankerKg: null, ankerDat: null, wasserKg: 2, wasserTage: 5, bandKg: 0.5 };
+  var TKEY = { trend_fenster_tage: "fenster", anlauf_tage: "anlauf", watch_luecke_kcal: "luecke", muskel_kg_woche: "mkg", muskel_kcal_tag: "mkcal", kcal_pro_kg: "kcalkg", trend_streuung_kg_woche: "sd", trend_senken_ab: "senken", trend_erhoehen_bis: "erhoehen", stufe_schritt_kcal: "schritt", ampel_min_tage: "ampelMin", zw_senken_ab: "zwSenken", zw_erhoehen_bis: "zwErhoehen", drift_warn_kcal: "driftKcal", drift_warn_tage: "driftTage", erw_anker_kg: "ankerKg", erw_anker_datum: "ankerDat", erw_wasser_kg: "wasserKg", erw_wasser_tage: "wasserTage", erw_band_kg: "bandKg" };
   /* Alle Beiwerke in EINER Abfrage: die Lese Rolle hat nur wenige Verbindungen, viele parallele Abfragen scheitern sonst ("too many connections") */
   var Q_META = "select (select coalesce(json_agg(t), '[]'::json) from (select key, value from v_parameter) t) as par, (select coalesce(json_agg(t), '[]'::json) from (select gruppe, soll_fett_kg, altlast_kg, cut_tage, fuer_cut from v_gruppe_soll) t) as soll, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, titel from v_ereignis order by datum) t) as ev, (select coalesce(json_agg(t), '[]'::json) from (select datum::text as d, gruppe, art from v_check order by datum) t) as chk, (select coalesce(json_agg(t), '[]'::json) from (select log_date::text as d, typ, n::int as n, minuten::float8 as minuten, kcal::float8 as kcal from v_tag_workouts order by log_date, kcal desc) t) as wk";
   function metaParse(rows) {
@@ -689,6 +689,49 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     return h + "</div>";
   }
 
+  /* ---------- Gewichtsverlauf: Erwartung gegen Ist (v1.14.0) ---------- */
+  /* Erwartung je Tag = Anker (Waage am Cut Ende) + Wasser (lineare Rampe) + Summe der Tagesbilanzen.
+     Tagesbilanz = (Saldo minus Watch Lücke minus Muskel kcal) / kcal pro kg + Muskel kg pro Woche / 7, dieselbe Rechnung wie "Kalorien erwarten" im Kurs.
+     Die Parameter liegen in Neon (erw_anker_kg, erw_anker_datum, erw_wasser_kg, erw_wasser_tage, erw_band_kg). Ohne Anker erscheint der Block nicht. */
+  function gewichtBlock(c) {
+    var x = c.last, aufbau = x.pt === "lean_gain" || (x.pt == null && /Lean Gain/i.test(c.g));
+    if (!aufbau || T.ankerKg == null || T.ankerDat == null) return "";
+    var as = String(Math.round(T.ankerDat)), ad = as.slice(0, 4) + "-" + as.slice(4, 6) + "-" + as.slice(6, 8);
+    var gap = diffDays(ad, c.first.d);
+    if (gap < 0 || gap > 7) return "";
+    var E = {}, cum = 0, miss = 0, i, d, dd, last = diffDays(ad, x.d);
+    for (i = 1; i <= last; i++) {
+      d = addDays(ad, i); dd = byDate[d];
+      if (dd && dd.saldo != null) cum += (dd.saldo - T.luecke - T.mkcal) / T.kcalkg + T.mkg / 7;
+      else { miss++; cum += (0 - T.luecke - T.mkcal) / T.kcalkg + T.mkg / 7; }
+      E[d] = T.ankerKg + T.wasserKg * Math.min(1, i / T.wasserTage) + cum;
+    }
+    function sg2(v) { return (v < 0 ? MINUS : "+") + f2(Math.abs(v)); }
+    var wks = [], ws = isoMonday(c.first.d), we, w, lastW = null;
+    while (ws <= x.d) {
+      we = addDays(ws, 6); w = { ws: ws, we: we, n: 0, sk: 0, se: 0 };
+      body.forEach(function (b) { if (b.kg != null && b.d >= ws && b.d <= we && b.d >= c.first.d && E[b.d] != null) { w.n++; w.sk += b.kg; w.se += E[b.d]; if (!lastW || b.d > lastW.d) lastW = { d: b.d, kg: b.kg, e: E[b.d] }; } });
+      if (w.n) { w.ist = w.sk / w.n; w.erw = w.se / w.n; w.diff = w.ist - w.erw; w.run = we > x.d; wks.push(w); }
+      ws = addDays(ws, 7);
+    }
+    if (!wks.length) return "";
+    var h = '<div class="sheet"><div class="kwhead">Gewichtsverlauf: Erwartung gegen Ist</div>';
+    h += row("Start", f1(T.ankerKg), "kg", "", "Waage am Cut Ende, " + dm(ad));
+    if (lastW) {
+      var dl = lastW.kg - lastW.e, al = Math.abs(dl), cl = al <= T.bandKg ? "s-gruen" : al <= 2 * T.bandKg ? "s-warn" : "s-rot";
+      h += row("Letzte Wiegung", f1(lastW.kg), "kg", "", wd(lastW.d) + " " + dm(lastW.d) + ", Erwartung " + f1(lastW.e) + " ± " + f1(T.bandKg) + ", Differenz <span class=\"" + cl + "\">" + sg2(dl) + "</span> (Einzeltage schwanken um 0,5 bis 0,9 kg)");
+    }
+    wks.slice().reverse().forEach(function (q) {
+      var a = Math.abs(q.diff), cls = a <= T.bandKg ? "s-gruen" : a <= 2 * T.bandKg ? "s-warn" : "s-rot", sym = a <= T.bandKg ? "✓" : "●";
+      h += '<div class="row"><span class="label">KW ' + isoWeek(q.ws) + "<small>" + dm(q.ws) + " bis " + dm(q.we) + " · " + q.n + (q.n === 1 ? " Wiegung" : " Wiegungen") + (q.run ? " · läuft" : "") +
+        " · Erwartung " + f1(q.erw) + " ± " + f1(T.bandKg) + ", Differenz " + sg2(q.diff) + '</small></span><span class="value"><span class="num ' + cls + '">' + sym + " " + f1(q.ist) + '</span><span class="unit">kg</span></span></div>';
+    });
+    h += '<div class="legend"><span>✓ Wochenmittel im Band ±' + f1(T.bandKg) + " kg</span><span>● außerhalb</span></div>";
+    h += '<div class="info" style="margin:0 14px 12px">Erwartung = ' + f1(T.ankerKg) + " kg am Cut Ende + " + f1(T.wasserKg) + " kg Wasser, Glykogen und Darminhalt (kommen in " + T.wasserTage + " Tagen zurück) + die Kalorienbilanz seit " + dm(ad) + " (Saldo minus Watch Lücke " + T.luecke + " kcal, Muskel " + f2(T.mkg) + " kg pro Woche)." +
+      (miss ? " Für " + miss + (miss === 1 ? " Tag" : " Tage") + " fehlt der Saldo, dort wurde Saldo 0 angesetzt." : "") + "</div>";
+    return h + "</div>";
+  }
+
   function renderPhase() {
     var el = document.getElementById("v-phase");
     var gs = groups(), i, ci = -1;
@@ -720,6 +763,7 @@ tfoot td { font-weight: 700; border-top: 2px solid var(--line); }
     if (x.kum != null) h += phaseCut(x);
     h += "</div>";
     h += kursBlock(c);
+    h += gewichtBlock(c);
     if (weeks.length) {
       h += '<div class="sheet"><div class="kwhead">Kalenderwochen</div>';
       weeks.slice().reverse().forEach(function (w) {
