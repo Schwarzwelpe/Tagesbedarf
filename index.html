@@ -260,7 +260,7 @@ html.standalone .hero { top: 44px; }
 <main>
   <header>
     <h1>Tagesplanung</h1>
-    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.13.0<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
+    <span class="head-right"><button type="button" class="ver" id="sync-toggle" aria-label="Sync Status und Zugang" aria-expanded="false">v1.13.1<i class="dot s-off" id="sync-dot"></i></button><a class="navlink" href="bilanz.html">Bilanz</a><span class="pill" id="slot-pill">Slot 1</span></span>
   </header>
 
   <section class="sheet sync" id="sync-panel" aria-label="Sync zwischen den Geräten" hidden>
@@ -463,10 +463,13 @@ html.standalone .hero { top: 44px; }
      ist er abgelaufen: Training, Alltag, Essen, Aktivität Ist und Ruhe springen auf die Standardwerte wie beim Reset (die Stufe bleibt). Das passiert
      nur in der Anzeige und ändert nichts an Neon; jedes Gerät rechnet es aus dem Zeitstempel der letzten Änderung selbst aus. */
   var GRACE_DAYS = 2;
+  /* Tagesgrenze 06:00: Änderungen zwischen 00:00 und 06:00 zählen noch für den Vortag (Ist Eintrag und Tagesabschluss kommen kurz nach Mitternacht;
+     ohne diese Grenze wanderte der Slot eine Woche weiter). Gleiche Regel wie die Neon Funktion plan_datum. */
+  var DAY_START_H = 6;
   function expiryOf(i) {
     var lt = data.meta[i].lt;
     if (!lt) return 0;
-    var e = new Date(lt), add = (i - ((e.getDay() + 6) % 7) + 7) % 7;
+    var e = new Date(lt - DAY_START_H * 3600000), add = (i - ((e.getDay() + 6) % 7) + 7) % 7;
     return new Date(e.getFullYear(), e.getMonth(), e.getDate() + add + GRACE_DAYS).getTime();
   }
   function isStale(i) { var x = expiryOf(i); return x > 0 && x <= Date.now(); }
